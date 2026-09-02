@@ -400,7 +400,7 @@ public class CompetencyService {
             LocalDate date = h.getScoredAt().atZone(ZoneId.systemDefault()).toLocalDate();
             LocalDate bucket = byMonth
                     ? date.withDayOfMonth(1)
-                    : date.with(WeekFields.ISO.getFirstDayOfWeek(), 1);
+                    : date.with(WeekFields.ISO.dayOfWeek(), 1L);
 
             Short effective = h.getLeadScore() != null ? h.getLeadScore() : h.getSelfScore();
             if (effective != null) {

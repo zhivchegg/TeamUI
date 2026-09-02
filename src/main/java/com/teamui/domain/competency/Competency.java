@@ -31,7 +31,7 @@ public class Competency {
     private Integer sortOrder = 0;
 
     /** JPA default constructor. */
-    protected Competency() {}
+    public Competency() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

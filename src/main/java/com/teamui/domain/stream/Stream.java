@@ -46,7 +46,7 @@ public class Stream {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected Stream() {}
+    public Stream() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

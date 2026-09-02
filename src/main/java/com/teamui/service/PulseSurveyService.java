@@ -165,7 +165,7 @@ public class PulseSurveyService {
             if (s.getEnergyScore() == null) continue;
             LocalDate date = s.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate();
             LocalDate bucket = byMonth ? date.withDayOfMonth(1)
-                    : date.with(WeekFields.ISO.getFirstDayOfWeek(), 1);
+                    : date.with(WeekFields.ISO.dayOfWeek(), 1L);
             buckets.computeIfAbsent(bucket, k -> new ArrayList<>()).add(s.getEnergyScore());
         }
 

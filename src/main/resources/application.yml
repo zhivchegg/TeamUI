@@ -23,10 +23,9 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         jdbc:
           batch_size: 20
         order_inserts: true
@@ -35,7 +34,7 @@ spring:
     show-sql: false
 
   flyway:
-    enabled: true
+    enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -45,6 +44,15 @@ teamui:
     expiration-hours: 24
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   level:

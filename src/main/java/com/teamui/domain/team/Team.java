@@ -36,7 +36,7 @@ public class Team {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected Team() {}
+    public Team() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

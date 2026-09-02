@@ -72,7 +72,7 @@ public class Meeting {
     private Instant updatedAt;
 
     /** JPA default constructor. */
-    protected Meeting() {}
+    public Meeting() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

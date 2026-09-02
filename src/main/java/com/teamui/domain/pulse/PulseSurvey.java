@@ -41,7 +41,7 @@ public class PulseSurvey {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected PulseSurvey() {}
+    public PulseSurvey() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

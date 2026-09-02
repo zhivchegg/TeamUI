@@ -42,7 +42,7 @@ public class SystemExpertise {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected SystemExpertise() {}
+    public SystemExpertise() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

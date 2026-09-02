@@ -41,7 +41,7 @@ public class ITSystem {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected ITSystem() {}
+    public ITSystem() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

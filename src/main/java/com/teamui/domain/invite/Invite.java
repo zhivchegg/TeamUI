@@ -54,7 +54,7 @@ public class Invite {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected Invite() {}
+    public Invite() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

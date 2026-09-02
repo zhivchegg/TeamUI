@@ -80,9 +80,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/competencies/scores/**/lead").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/competencies/scores/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/competencies/scores/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/competencies/scores/user/{userId}/lead").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/competencies/scores/user/{userId}/lead").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/competencies/scores/user/{userId}").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/systems/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/systems/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/systems/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
@@ -98,8 +98,7 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }

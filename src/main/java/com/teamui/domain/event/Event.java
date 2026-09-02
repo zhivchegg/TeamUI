@@ -64,7 +64,7 @@ public class Event {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected Event() {}
+    public Event() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

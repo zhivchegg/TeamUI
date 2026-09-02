@@ -56,7 +56,7 @@ public class MeetingAction {
     private Instant updatedAt;
 
     /** JPA default constructor. */
-    protected MeetingAction() {}
+    public MeetingAction() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

@@ -48,7 +48,7 @@ public class UserCompetencyScoreHistory {
     private Instant scoredAt;
 
     /** JPA default constructor. */
-    protected UserCompetencyScoreHistory() {}
+    public UserCompetencyScoreHistory() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

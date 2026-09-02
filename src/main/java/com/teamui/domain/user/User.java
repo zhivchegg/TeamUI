@@ -54,7 +54,7 @@ public class User {
     private Instant updatedAt;
 
     /** JPA default constructor. */
-    protected User() {}
+    public User() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

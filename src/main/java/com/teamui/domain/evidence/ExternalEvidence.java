@@ -67,7 +67,7 @@ public class ExternalEvidence {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected ExternalEvidence() {}
+    public ExternalEvidence() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

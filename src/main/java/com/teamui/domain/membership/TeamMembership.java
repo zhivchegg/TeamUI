@@ -53,7 +53,7 @@ public class TeamMembership {
     private Instant leftAt;
 
     /** JPA default constructor. */
-    protected TeamMembership() {}
+    public TeamMembership() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

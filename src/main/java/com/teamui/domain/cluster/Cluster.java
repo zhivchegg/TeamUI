@@ -45,7 +45,7 @@ public class Cluster {
     private Instant createdAt;
 
     /** JPA default constructor. */
-    protected Cluster() {}
+    public Cluster() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

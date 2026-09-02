@@ -51,7 +51,7 @@ public class UserCompetencyScore {
     private Instant scoredAt = Instant.now();
 
     /** JPA default constructor. */
-    protected UserCompetencyScore() {}
+    public UserCompetencyScore() {}
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
