@@ -1,0 +1,53 @@
+# Compiled output
+/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment / secrets
+.env
+*.env
+!.env.example
+application-local.yml
+application-dev.yml
+
+# Docker volumes (do not commit actual data)
+/postgres_data/
+
+# Node (if frontend added later)
+node_modules/
+dist/
+build/
+
+# Claude Artifacts
+.claude/
+
+# Windows
+*.lnk

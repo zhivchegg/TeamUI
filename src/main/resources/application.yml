@@ -1,0 +1,52 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: teamui
+
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/teamui
+    username: teamui
+    password: teamui
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      connection-timeout: 20000
+      leak-detection-threshold: 30000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        format_sql: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+teamui:
+  jwt:
+    secret: ${JWT_SECRET:ChangeThisSecretInProduction32CharsMin}
+    expiration-hours: 24
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    com.teamui: DEBUG
