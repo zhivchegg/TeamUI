@@ -3,12 +3,17 @@ import type {
   ActionBody,
   ActionItem,
   CreateMeetingBody,
+  CreateEventBody,
+  CreateSystemBody,
   Dashboard,
+  ExpertiseLevel,
   LoginResult,
   Meeting,
   MeetingParticipant,
   NotificationItem,
   Page,
+  PulseBody,
+  SystemWithPeople,
   UpdateAgendaBody,
   UpdateMeetingBody,
   UpdateNotesBody,
@@ -80,6 +85,28 @@ export function listParticipantMeetings(page = 0, size = 20): Promise<Page<Meeti
 
 export function deleteMeeting(id: string): Promise<void> {
   return apiFetch<void>(`/api/meetings/${id}`, { method: 'DELETE' });
+}
+
+// ----- Самочувствие, события, системы -----
+
+export function submitPulse(body: PulseBody): Promise<unknown> {
+  return apiFetch<unknown>('/api/pulse', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function createEvent(body: CreateEventBody): Promise<unknown> {
+  return apiFetch<unknown>('/api/events', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function listTeamSystems(teamId: string): Promise<SystemWithPeople[]> {
+  return apiFetch<SystemWithPeople[]>(`/api/systems/knowledge/team/${teamId}`);
+}
+
+export function createSystem(body: CreateSystemBody): Promise<unknown> {
+  return apiFetch<unknown>('/api/systems', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function assignExpertise(systemId: string, body: { userId: string; level: ExpertiseLevel }): Promise<unknown> {
+  return apiFetch<unknown>(`/api/systems/${systemId}/expertise`, { method: 'POST', body: JSON.stringify(body) });
 }
 
 // ----- Уведомления -----

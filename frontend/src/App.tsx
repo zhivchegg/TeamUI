@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { MeetingsPage } from './pages/MeetingsPage';
 import { MeetingDetailPage } from './pages/MeetingDetailPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { SystemsPage } from './pages/SystemsPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ function Shell() {
             <Link to="/">Дашборд</Link>
             <Link to="/meetings">Встречи</Link>
             <Link to="/notifications">Уведомления{unread > 0 ? ` (${unread})` : ''}</Link>
+            {(user.role === 'TEAM_LEAD' || user.role === 'IT_LEAD') && <Link to="/systems">Системы</Link>}
             <button type="button" className="link" onClick={() => void signOut()}>
               Выйти
             </button>
@@ -67,6 +69,14 @@ function Shell() {
             element={
               <RequireAuth>
                 <MeetingsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/systems"
+            element={
+              <RequireAuth>
+                <SystemsPage />
               </RequireAuth>
             }
           />

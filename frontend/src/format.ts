@@ -33,6 +33,41 @@ const CRITICALITY_LABELS: Record<string, string> = {
   LOW: 'Низкая',
 };
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  ACHIEVEMENT: 'Достижение',
+  NOTE: 'Заметка',
+  TRAINING: 'Обучение',
+  INCIDENT: 'Инцидент',
+  LATENESS: 'Опоздание',
+  TASK_MISS: 'Срыв задачи',
+};
+
+const IMPACT_LABELS: Record<string, string> = {
+  POSITIVE_LOW: 'Положительное, слабое',
+  POSITIVE_HIGH: 'Положительное, сильное',
+  NEGATIVE_LOW: 'Отрицательное, слабое',
+  NEGATIVE_HIGH: 'Отрицательное, сильное',
+};
+
+const EXPERTISE_LABELS: Record<string, string> = {
+  EXPERT: 'Эксперт',
+  ADVANCED: 'Продвинутый',
+  BASIC: 'Базовый',
+  NONE: 'Нет',
+};
+
+export function eventTypeLabel(value: string): string {
+  return EVENT_TYPE_LABELS[value] ?? value;
+}
+
+export function impactLabel(value: string): string {
+  return IMPACT_LABELS[value] ?? value;
+}
+
+export function expertiseLabel(value: string): string {
+  return EXPERTISE_LABELS[value] ?? value;
+}
+
 export function criticalityLabel(value: string): string {
   return CRITICALITY_LABELS[value] ?? value;
 }

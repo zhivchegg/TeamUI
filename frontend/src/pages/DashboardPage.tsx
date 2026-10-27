@@ -1,16 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { getDashboard, listLeadMeetings } from '../api/endpoints';
-import type { Dashboard, Meeting, MeetingPreview } from '../api/types';
-import { criticalityLabel, formatDateTime, meetingStatusLabel } from '../format';
+import { ApiError } from '../api/client';
+import { createEvent, getDashboard, listLeadMeetings, submitPulse } from '../api/endpoints';
+import type { Dashboard, EventType, ImpactLevel, Meeting, MeetingPreview, TeamMemberCard } from '../api/types';
+import { criticalityLabel, eventTypeLabel, formatDateTime, impactLabel, meetingStatusLabel } from '../format';
+
+const EVENT_TYPES: EventType[] = ['ACHIEVEMENT', 'NOTE', 'TRAINING', 'INCIDENT', 'LATENESS', 'TASK_MISS'];
+const IMPACT_LEVELS: ImpactLevel[] = ['POSITIVE_LOW', 'POSITIVE_HIGH', 'NEGATIVE_LOW', 'NEGATIVE_HIGH'];
 
 export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [leadMeetings, setLeadMeetings] = useState<Meeting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadDashboard() {
     getDashboard().then(setData).catch(() => setError('Не удалось загрузить дашборд'));
+  }
+
+  useEffect(() => {
+    loadDashboard();
     listLeadMeetings(0, 50)
       .then((page) => setLeadMeetings(page.content))
       .catch(() => setLeadMeetings([]));
@@ -59,6 +67,8 @@ export function DashboardPage() {
 
       {member && (
         <>
+          <PulseForm />
+
           <section className="card">
             <h2>Моя следующая встреча</h2>
             {member.upcomingMeeting ? (
@@ -109,7 +119,7 @@ export function DashboardPage() {
         </>
       )}
 
-      {isLead && (
+      {isLead && !team && (
         <section className="card">
           <h2>Мои ближайшие встречи</h2>
           {leadMeetings === null ? (
@@ -147,7 +157,14 @@ export function DashboardPage() {
             <p>
               Просроченных действий: <strong>{team.overdueActions.length}</strong>
             </p>
+            <p>
+              <Link to="/systems">Системы и экспертиза команды</Link>
+            </p>
           </section>
+
+          {data.teamId && (
+            <EventForm teamId={data.teamId} members={team.memberCards} onCreated={loadDashboard} />
+          )}
 
           {team.overdueActions.length > 0 && (
             <section className="card">
@@ -331,6 +348,174 @@ export function DashboardPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/** Опрос самочувствия: участник отмечает энергию и, если хочет, что мешает. */
+function PulseForm() {
+  const [energy, setEnergy] = useState('');
+  const [burden, setBurden] = useState('');
+  const [topics, setTopics] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setStatus(null);
+    try {
+      await submitPulse({
+        energyScore: Number(energy),
+        burdenNote: burden.trim() || null,
+        topics: topics.trim() || null,
+      });
+      setStatus('Спасибо, запись сохранена.');
+      setBurden('');
+      setTopics('');
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 403 ? 'Недостаточно прав.' : 'Не удалось сохранить.');
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>Как вы себя чувствуете?</h2>
+      <form onSubmit={onSubmit} className="stack">
+        <label>
+          Энергия (1–5)
+          <select required value={energy} onChange={(e) => setEnergy(e.target.value)}>
+            <option value="" disabled>
+              Выберите
+            </option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={String(n)}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Что мешает работать (необязательно)
+          <textarea rows={2} value={burden} onChange={(e) => setBurden(e.target.value)} />
+        </label>
+        <label>
+          О чём хотите поговорить (необязательно)
+          <textarea rows={2} value={topics} onChange={(e) => setTopics(e.target.value)} />
+        </label>
+        <div className="row">
+          <button type="submit" disabled={!energy}>
+            Отправить
+          </button>
+          {status && <span className="muted">{status}</span>}
+          {error && <span className="error">{error}</span>}
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/** Событие в таймлайне участника, которое добавляет лид команды. */
+function EventForm({
+  teamId,
+  members,
+  onCreated,
+}: {
+  teamId: string;
+  members: TeamMemberCard[];
+  onCreated: () => void;
+}) {
+  const [userId, setUserId] = useState('');
+  const [eventType, setEventType] = useState<EventType>('ACHIEVEMENT');
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [impact, setImpact] = useState('');
+  const [visible, setVisible] = useState(true);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setStatus(null);
+    try {
+      await createEvent({
+        userId,
+        teamId,
+        eventType,
+        category: category.trim() || null,
+        title: title.trim(),
+        impactLevel: impact ? (impact as ImpactLevel) : null,
+        visibleToEmployee: visible,
+      });
+      setStatus('Событие добавлено.');
+      setTitle('');
+      setCategory('');
+      setImpact('');
+      onCreated();
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 403 ? 'Недостаточно прав.' : 'Не удалось добавить событие.');
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>Добавить событие</h2>
+      <form onSubmit={onSubmit} className="stack">
+        <label>
+          Участник
+          <select required value={userId} onChange={(e) => setUserId(e.target.value)}>
+            <option value="" disabled>
+              Выберите участника
+            </option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.fullName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Тип
+          <select value={eventType} onChange={(e) => setEventType(e.target.value as EventType)}>
+            {EVENT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {eventTypeLabel(t)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Название
+          <input required value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label>
+          Категория (необязательно)
+          <input value={category} onChange={(e) => setCategory(e.target.value)} />
+        </label>
+        <label>
+          Влияние (необязательно)
+          <select value={impact} onChange={(e) => setImpact(e.target.value)}>
+            <option value="">Не указано</option>
+            {IMPACT_LEVELS.map((i) => (
+              <option key={i} value={i}>
+                {impactLabel(i)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="row">
+          <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
+          Видно участнику
+        </label>
+        <div className="row">
+          <button type="submit" disabled={!userId || !title.trim()}>
+            Добавить
+          </button>
+          {status && <span className="muted">{status}</span>}
+          {error && <span className="error">{error}</span>}
+        </div>
+      </form>
+    </section>
   );
 }
 

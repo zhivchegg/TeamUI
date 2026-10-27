@@ -126,6 +126,44 @@ export interface TeamHealth {
   unacknowledgedEvents: TimelineEvent[];
 }
 
+/** Система с людьми по уровню экспертизы (com.teamui.dto.SystemWithPeopleDto). */
+export interface SystemWithPeople {
+  id: string;
+  name: string;
+  criticality: string;
+  experts: string[];
+  advanced: string[];
+  basic: string[];
+}
+
+export type ExpertiseLevel = 'EXPERT' | 'ADVANCED' | 'BASIC' | 'NONE';
+export type Criticality = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type EventType = 'ACHIEVEMENT' | 'NOTE' | 'TRAINING' | 'INCIDENT' | 'LATENESS' | 'TASK_MISS';
+export type ImpactLevel = 'POSITIVE_LOW' | 'POSITIVE_HIGH' | 'NEGATIVE_LOW' | 'NEGATIVE_HIGH';
+
+export interface PulseBody {
+  energyScore: number;
+  burdenNote: string | null;
+  topics: string | null;
+}
+
+export interface CreateEventBody {
+  userId: string;
+  teamId: string;
+  eventType: EventType;
+  category: string | null;
+  title: string;
+  impactLevel: ImpactLevel | null;
+  visibleToEmployee: boolean;
+}
+
+export interface CreateSystemBody {
+  name: string;
+  description: string | null;
+  criticality: Criticality;
+  teamId: string;
+}
+
 /** Уведомление пользователя (com.teamui.dto.NotificationResponse). */
 export interface NotificationItem {
   id: string;
@@ -141,6 +179,8 @@ export interface Dashboard {
   role: string | null;
   /** Название команды для участника и лидов команды, иначе null. */
   teamName: string | null;
+  /** Идентификатор команды для участника и лидов команды, иначе null. */
+  teamId: string | null;
   memberMetrics: MemberMetrics | null;
   teamHealth: TeamHealth | null;
   streamOverview: StreamOverview | null;
