@@ -124,6 +124,7 @@ select,
 textarea,
 button {
   font: inherit;
+  font-size: 0.95rem;
   padding: 0.5rem 0.65rem;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -194,6 +195,30 @@ textarea {
   resize: vertical;
 }
 
+/* Списки выглядят как поля ввода: тот же фон и рамка, стрелка одна на всех. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 fill=%27none%27 stroke=%27%23667085%27 stroke-width=%271.5%27/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+
+select option {
+  background: var(--card);
+  color: var(--fg);
+}
+
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
 @media (max-width: 480px) {
   main {
     padding: 0.75rem;
@@ -224,4 +249,47 @@ textarea {
 
 .notifications li {
   margin: 0.25rem 0;
+}
+
+.person-select {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.person-select-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.person-select-list li {
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+
+.person-select-list li.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.person-select-list .person-name {
+  display: block;
+  font-weight: 600;
+}
+
+.person-select-list .person-hint {
+  display: block;
+  font-size: 0.85em;
+  color: var(--muted);
 }

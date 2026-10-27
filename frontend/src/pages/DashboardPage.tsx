@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { createEvent, getDashboard, listLeadMeetings, submitPulse } from '../api/endpoints';
 import type { Dashboard, EventType, ImpactLevel, Meeting, MeetingPreview, TeamMemberCard } from '../api/types';
 import { criticalityLabel, eventTypeLabel, formatDateTime, impactLabel, meetingStatusLabel } from '../format';
+import { PersonSelect } from '../components/PersonSelect';
 
 const EVENT_TYPES: EventType[] = ['ACHIEVEMENT', 'NOTE', 'TRAINING', 'INCIDENT', 'LATENESS', 'TASK_MISS'];
 const IMPACT_LEVELS: ImpactLevel[] = ['POSITIVE_LOW', 'POSITIVE_HIGH', 'NEGATIVE_LOW', 'NEGATIVE_HIGH'];
@@ -149,10 +150,19 @@ export function DashboardPage() {
             <p>
               Энергия команды:{' '}
               {team.teamEnergyAverage === null ? (
-                <span className="muted">нет данных опросов</span>
+                <span className="muted">
+                  мало данных: {team.energyResponses} из {team.energyMinResponses} ответов за последние 4 недели
+                </span>
               ) : (
                 <strong>{team.teamEnergyAverage.toFixed(1)} из 5</strong>
-              )}
+              )}{' '}
+              <span
+                className="muted"
+                title="Среднее всех опросов самочувствия участников команды. Участник отправляет опрос сам, на своём дашборде."
+              >
+                ⓘ
+              </span>{' '}
+              <Link to="/manual#energy">Откуда берётся энергия</Link>
             </p>
             <p>
               Просроченных действий: <strong>{team.overdueActions.length}</strong>
@@ -461,19 +471,13 @@ function EventForm({
     <section className="card">
       <h2>Добавить событие</h2>
       <form onSubmit={onSubmit} className="stack">
-        <label>
-          Участник
-          <select required value={userId} onChange={(e) => setUserId(e.target.value)}>
-            <option value="" disabled>
-              Выберите участника
-            </option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.fullName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PersonSelect
+          label="Участник"
+          required
+          value={userId}
+          onChange={setUserId}
+          options={members.map((m) => ({ id: m.id, label: m.fullName }))}
+        />
         <label>
           Тип
           <select value={eventType} onChange={(e) => setEventType(e.target.value as EventType)}>

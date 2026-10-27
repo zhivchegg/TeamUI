@@ -1,22 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../api/errors';
+import { PersonSelect } from '../components/PersonSelect';
 import { createMeeting, listLeadMeetings, listMeetingParticipants, listParticipantMeetings } from '../api/endpoints';
 import type { Meeting, MeetingLevel, MeetingParticipant } from '../api/types';
 import {
   formatDateTime,
   isoToLocalInput,
   localInputToIso,
-  meetingLevelLabel,
   meetingStatusLabel,
 } from '../format';
 
 /** Группы участников в выпадающем списке, в порядке уровней. */
-const PARTICIPANT_GROUPS: { level: MeetingLevel; label: string }[] = [
-  { level: 'TEAM', label: 'Члены команды' },
-  { level: 'CLUSTER', label: 'Лиды команд' },
-  { level: 'STREAM', label: 'Лиды кластеров' },
-];
+const GROUP_LABELS: Record<MeetingLevel, string> = {
+  TEAM: 'член команды',
+  CLUSTER: 'лид команды',
+  STREAM: 'лид кластера',
+};
 
 export function MeetingsPage() {
   const [asParticipant, setAsParticipant] = useState<Meeting[] | null>(null);
@@ -96,29 +96,17 @@ export function MeetingsPage() {
             <h2>Новая встреча</h2>
             {participants === null ? null : (
               <form onSubmit={onCreate} className="stack">
-                <label>
-                  Участник
-                  <select required value={participantId} onChange={(e) => setParticipantId(e.target.value)}>
-                    <option value="" disabled>
-                      Выберите участника
-                    </option>
-                    {PARTICIPANT_GROUPS.map((group) => {
-                      const items = participants.filter((p) => p.level === group.level);
-                      if (items.length === 0) {
-                        return null;
-                      }
-                      return (
-                        <optgroup key={group.level} label={group.label}>
-                          {items.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.fullName} — {p.scopeName}
-                            </option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
-                  </select>
-                </label>
+                <PersonSelect
+                  label="Участник"
+                  required
+                  value={participantId}
+                  onChange={setParticipantId}
+                  options={participants.map((p) => ({
+                    id: p.id,
+                    label: p.fullName,
+                    hint: `${p.scopeName}, ${GROUP_LABELS[p.level]}`,
+                  }))}
+                />
                 <label>
                   Дата и время
                   <input
@@ -170,7 +158,6 @@ function MeetingTable({ meetings, view }: { meetings: Meeting[] | null; view: 'p
         <tr>
           <th>Дата</th>
           <th>{view === 'participant' ? 'Ведущий' : 'Участник'}</th>
-          <th>Уровень</th>
           <th>Статус</th>
         </tr>
       </thead>
@@ -181,7 +168,6 @@ function MeetingTable({ meetings, view }: { meetings: Meeting[] | null; view: 'p
               <Link to={`/meetings/${m.id}`}>{formatDateTime(m.scheduledDate)}</Link>
             </td>
             <td>{view === 'participant' ? m.leadName : m.participantName}</td>
-            <td>{meetingLevelLabel(m.level)}</td>
             <td>{meetingStatusLabel(m.status)}</td>
           </tr>
         ))}

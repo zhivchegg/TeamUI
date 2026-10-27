@@ -3,6 +3,7 @@ import { ApiError } from '../api/client';
 import { assignExpertise, createSystem, getDashboard, listTeamSystems } from '../api/endpoints';
 import type { Criticality, Dashboard, ExpertiseLevel, SystemWithPeople, TeamMemberCard } from '../api/types';
 import { criticalityLabel } from '../format';
+import { PersonSelect } from '../components/PersonSelect';
 
 const CRITICALITIES: Criticality[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const LEVELS: { value: ExpertiseLevel; label: string }[] = [
@@ -202,19 +203,13 @@ function ExpertiseForm({
               ))}
             </select>
           </label>
-          <label>
-            Участник
-            <select required value={userId} onChange={(e) => setUserId(e.target.value)}>
-              <option value="" disabled>
-                Выберите участника
-              </option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <PersonSelect
+            label="Участник"
+            required
+            value={userId}
+            onChange={setUserId}
+            options={members.map((m) => ({ id: m.id, label: m.fullName }))}
+          />
           <label>
             Уровень
             <select value={level} onChange={(e) => setLevel(e.target.value as ExpertiseLevel)}>

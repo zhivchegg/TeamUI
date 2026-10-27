@@ -3,6 +3,9 @@ import type {
   ActionBody,
   ActionItem,
   CreateMeetingBody,
+  CompetencyDefinition,
+  CompetencyDefinitionBody,
+  CompetencyScore,
   CreateEventBody,
   CreateSystemBody,
   Dashboard,
@@ -85,6 +88,36 @@ export function listParticipantMeetings(page = 0, size = 20): Promise<Page<Meeti
 
 export function deleteMeeting(id: string): Promise<void> {
   return apiFetch<void>(`/api/meetings/${id}`, { method: 'DELETE' });
+}
+
+// ----- Матрица компетенций -----
+
+export function listCompetencyMatrix(): Promise<CompetencyDefinition[]> {
+  return apiFetch<CompetencyDefinition[]>('/api/competencies/matrix');
+}
+
+export function createCompetency(body: CompetencyDefinitionBody): Promise<CompetencyDefinition> {
+  return apiFetch<CompetencyDefinition>('/api/competencies', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateCompetency(id: string, body: CompetencyDefinitionBody): Promise<CompetencyDefinition> {
+  return apiFetch<CompetencyDefinition>(`/api/competencies/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function deleteCompetency(id: string): Promise<void> {
+  return apiFetch<void>(`/api/competencies/${id}`, { method: 'DELETE' });
+}
+
+export function listCompetencyScores(userId: string): Promise<Page<CompetencyScore>> {
+  return apiFetch<Page<CompetencyScore>>(`/api/competencies/scores/user/${userId}?size=200`);
+}
+
+export function submitSelfScore(userId: string, body: { competencyId: string; selfScore: number; comment: string | null }): Promise<unknown> {
+  return apiFetch<unknown>(`/api/competencies/scores/user/${userId}/self`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function submitLeadScore(userId: string, body: { competencyId: string; leadScore: number; comment: string | null }): Promise<unknown> {
+  return apiFetch<unknown>(`/api/competencies/scores/user/${userId}/lead`, { method: 'POST', body: JSON.stringify(body) });
 }
 
 // ----- Самочувствие, события, системы -----

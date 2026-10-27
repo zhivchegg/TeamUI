@@ -122,7 +122,11 @@ export interface TeamHealth {
   overdueActions: QuickAction[];
   memberCards: TeamMemberCard[];
   busFactorAlerts: BusFactorAlert[];
+  /** Среднее, только если ответов не меньше energyMinResponses. */
   teamEnergyAverage: number | null;
+  /** Сколько участников ответили за последние 4 недели. */
+  energyResponses: number;
+  energyMinResponses: number;
   unacknowledgedEvents: TimelineEvent[];
 }
 
@@ -155,6 +159,41 @@ export interface CreateEventBody {
   title: string;
   impactLevel: ImpactLevel | null;
   visibleToEmployee: boolean;
+}
+
+/** Компетенция матрицы с описаниями четырёх уровней (com.teamui.dto.CompetencyDefinitionResponse). */
+export interface CompetencyDefinition {
+  id: string;
+  name: string;
+  description: string | null;
+  teamId: string | null;
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  canEdit: boolean;
+}
+
+export interface CompetencyDefinitionBody {
+  name: string;
+  description: string | null;
+  teamId: string | null;
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+}
+
+/** Оценка по компетенции: самооценка и оценка лида (com.teamui.dto.CompetencyScoreResponse). */
+export interface CompetencyScore {
+  userId: string;
+  userName: string;
+  competencyId: string;
+  competencyName: string;
+  selfScore: number | null;
+  leadScore: number | null;
+  scoredByName: string | null;
+  comment: string | null;
 }
 
 export interface CreateSystemBody {
