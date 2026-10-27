@@ -53,6 +53,11 @@ import java.util.stream.Collectors;
 @Service
 public class DashboardService {
 
+    /** Energy uses each member's latest check-in from this many days back. */
+    static final int ENERGY_WINDOW_DAYS = 28;
+    /** Team energy is shown only from this many answers, so single answers stay private. */
+    static final int ENERGY_MIN_RESPONSES = 5;
+
     /** Statuses of action items that still need attention. */
     private static final List<ActionStatus> OPEN_STATUSES = List.of(ActionStatus.OPEN, ActionStatus.IN_PROGRESS);
 
@@ -286,16 +291,19 @@ public class DashboardService {
         // Bus factor alerts
         List<BusFactorAlertDto> busAlerts = buildBusFactorAlerts(team);
 
-        // Team energy average over the pulse surveys of all members
-        var pulses = members.stream()
-                .flatMap(m -> pulseRepository.findAllByUserIdOrderByCreatedAtDesc(
-                        m.getUser().getId(), Pageable.unpaged()).getContent().stream())
+        // Team energy: the latest check-in of each member within the window. Shown only when enough
+        // people answered, so that the average cannot reveal a single person's score.
+        Instant energySince = now.minus(ENERGY_WINDOW_DAYS, ChronoUnit.DAYS);
+        List<Short> energies = members.stream()
+                .map(m -> pulseRepository.findAllByUserIdOrderByCreatedAtDesc(m.getUser().getId(), PageRequest.of(0, 1)))
+                .flatMap(page -> page.getContent().stream())
+                .filter(p -> p.getCreatedAt().isAfter(energySince) && p.getEnergyScore() != null)
+                .map(PulseSurvey::getEnergyScore)
                 .toList();
-        Double avgEnergy = pulses.stream()
-                .filter(p -> p.getEnergyScore() != null)
-                .mapToInt(p -> p.getEnergyScore())
-                .average().orElse(0);
-        if (avgEnergy == 0) avgEnergy = null;
+        int energyResponses = energies.size();
+        Double avgEnergy = energyResponses >= ENERGY_MIN_RESPONSES
+                ? energies.stream().mapToInt(Short::intValue).average().orElse(0)
+                : null;
 
         // Unacknowledged events (simplified: last 3 events)
         var events = eventRepository.findAllByTeamIdOrderByCreatedAtDesc(team.getId(), PageRequest.of(0, 3));
@@ -310,6 +318,8 @@ public class DashboardService {
                 memberCards,
                 busAlerts,
                 avgEnergy,
+                energyResponses,
+                ENERGY_MIN_RESPONSES,
                 unackEvents
         );
     }

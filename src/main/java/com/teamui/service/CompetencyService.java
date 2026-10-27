@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.WeekFields;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Business logic for the star-radar competency model.
@@ -37,17 +38,124 @@ public class CompetencyService {
     private final UserCompetencyScoreHistoryRepository historyRepository;
     private final UserRepository userRepository;
     private final TeamMembershipRepository teamMembershipRepository;
+    private final LeadershipResolver leadershipResolver;
 
     public CompetencyService(CompetencyRepository competencyRepository,
                              UserCompetencyScoreRepository scoreRepository,
                              UserCompetencyScoreHistoryRepository historyRepository,
                              UserRepository userRepository,
-                             TeamMembershipRepository teamMembershipRepository) {
+                             TeamMembershipRepository teamMembershipRepository,
+                             LeadershipResolver leadershipResolver) {
         this.competencyRepository = competencyRepository;
         this.scoreRepository = scoreRepository;
         this.historyRepository = historyRepository;
         this.userRepository = userRepository;
         this.teamMembershipRepository = teamMembershipRepository;
+        this.leadershipResolver = leadershipResolver;
+    }
+
+    // ------------------------------------------------------------------
+    // Matrix: the list of competencies and their level descriptions
+    // ------------------------------------------------------------------
+
+    /**
+     * Competencies the viewer sees: the company-wide ones and those of the viewer's teams.
+     */
+    @Transactional(readOnly = true)
+    public List<CompetencyDefinitionResponse> listMatrix(UserDetailsImpl viewer) {
+        Set<UUID> teamIds = teamMembershipRepository.findAllByUserId(viewer.getId(), Pageable.unpaged())
+                .getContent().stream()
+                .map(m -> m.getTeam().getId())
+                .collect(Collectors.toSet());
+        return competencyRepository.findAllByOrderBySortOrderAsc().stream()
+                .filter(c -> c.getTeamId() == null || teamIds.contains(c.getTeamId()))
+                .map(c -> toDefinition(c, viewer))
+                .toList();
+    }
+
+    /**
+     * Add a competency. Company-wide ones are added by stream leads, team ones by the team's leads.
+     */
+    @Transactional
+    public CompetencyDefinitionResponse createCompetency(UserDetailsImpl viewer, CompetencyDefinitionRequest request) {
+        requireCanEdit(viewer, request.teamId());
+        Competency competency = new Competency();
+        competency.setTeamId(request.teamId());
+        applyDefinition(competency, request);
+        competency.setSortOrder(nextSortOrder());
+        return toDefinition(competencyRepository.save(competency), viewer);
+    }
+
+    /**
+     * Change a competency's name, short description and level descriptions. Its team does not change.
+     */
+    @Transactional
+    public CompetencyDefinitionResponse updateCompetency(UserDetailsImpl viewer, UUID competencyId,
+                                                         CompetencyDefinitionRequest request) {
+        Competency competency = findCompetency(competencyId);
+        requireCanEdit(viewer, competency.getTeamId());
+        applyDefinition(competency, request);
+        return toDefinition(competencyRepository.save(competency), viewer);
+    }
+
+    /**
+     * Delete a competency. A competency that already has ratings is kept, so that history stays readable.
+     */
+    @Transactional
+    public void deleteCompetency(UserDetailsImpl viewer, UUID competencyId) {
+        Competency competency = findCompetency(competencyId);
+        requireCanEdit(viewer, competency.getTeamId());
+        if (scoreRepository.countByCompetencyId(competencyId) > 0) {
+            throw new IllegalArgumentException("Competency has ratings and cannot be deleted");
+        }
+        competencyRepository.delete(competency);
+    }
+
+    private Competency findCompetency(UUID competencyId) {
+        return competencyRepository.findById(competencyId)
+                .orElseThrow(() -> new NotFoundException("Competency not found"));
+    }
+
+    private void applyDefinition(Competency competency, CompetencyDefinitionRequest request) {
+        competency.setName(request.name().trim());
+        competency.setDescription(blankToNull(request.description()));
+        competency.setLevel1(blankToNull(request.level1()));
+        competency.setLevel2(blankToNull(request.level2()));
+        competency.setLevel3(blankToNull(request.level3()));
+        competency.setLevel4(blankToNull(request.level4()));
+    }
+
+    /** Company-wide competencies: stream leads and admins. Team competencies: that team's leads. */
+    private void requireCanEdit(UserDetailsImpl viewer, UUID teamId) {
+        boolean allowed = teamId == null
+                ? isAdmin(viewer) || !leadershipResolver.ledStreamIds(viewer.getId()).isEmpty()
+                : isTeamLead(viewer.getId(), teamId);
+        if (!allowed) {
+            throw new AccessDeniedException("Not allowed to edit this competency");
+        }
+    }
+
+    private boolean isTeamLead(UUID userId, UUID teamId) {
+        return teamMembershipRepository.findByUserIdAndTeamIdAndRole(userId, teamId, UserRole.TEAM_LEAD).isPresent()
+                || teamMembershipRepository.findByUserIdAndTeamIdAndRole(userId, teamId, UserRole.IT_LEAD).isPresent();
+    }
+
+    private int nextSortOrder() {
+        return competencyRepository.findAllByOrderBySortOrderAsc().stream()
+                .mapToInt(Competency::getSortOrder)
+                .max().orElse(0) + 1;
+    }
+
+    private CompetencyDefinitionResponse toDefinition(Competency c, UserDetailsImpl viewer) {
+        boolean canEdit = c.getTeamId() == null
+                ? isAdmin(viewer) || !leadershipResolver.ledStreamIds(viewer.getId()).isEmpty()
+                : isTeamLead(viewer.getId(), c.getTeamId());
+        return new CompetencyDefinitionResponse(c.getId(), c.getName(), c.getDescription(), c.getTeamId(),
+                c.getLevel1(), c.getLevel2(), c.getLevel3(), c.getLevel4(), canEdit);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     // ------------------------------------------------------------------

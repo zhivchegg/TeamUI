@@ -22,5 +22,7 @@ public record TeamHealthDto(
         List<TeamMemberCardDto> memberCards,
         List<BusFactorAlertDto> busFactorAlerts,
         Double teamEnergyAverage,
+        int energyResponses,
+        int energyMinResponses,
         List<TimelineEventPreviewDto> unacknowledgedEvents
 ) {}

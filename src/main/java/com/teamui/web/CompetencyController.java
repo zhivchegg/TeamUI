@@ -57,6 +57,37 @@ public class CompetencyController {
     /**
      * List competency scores for a user (both self and lead ratings).
      */
+    /**
+     * Competencies visible to the caller, with level descriptions and whether the caller may edit them.
+     */
+    @GetMapping("/matrix")
+    public ResponseEntity<List<CompetencyDefinitionResponse>> listMatrix(@AuthenticationPrincipal UserDetailsImpl user) {
+        return ResponseEntity.ok(competencyService.listMatrix(user));
+    }
+
+    @PostMapping
+    public ResponseEntity<CompetencyDefinitionResponse> createCompetency(
+            @AuthenticationPrincipal UserDetailsImpl user,
+            @RequestBody @Valid CompetencyDefinitionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(competencyService.createCompetency(user, request));
+    }
+
+    @PutMapping("/{competencyId}")
+    public ResponseEntity<CompetencyDefinitionResponse> updateCompetency(
+            @AuthenticationPrincipal UserDetailsImpl user,
+            @PathVariable UUID competencyId,
+            @RequestBody @Valid CompetencyDefinitionRequest request) {
+        return ResponseEntity.ok(competencyService.updateCompetency(user, competencyId, request));
+    }
+
+    @DeleteMapping("/{competencyId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCompetency(
+            @AuthenticationPrincipal UserDetailsImpl user,
+            @PathVariable UUID competencyId) {
+        competencyService.deleteCompetency(user, competencyId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @GetMapping("/scores/user/{userId}")
     public ResponseEntity<Page<CompetencyScoreResponse>> getScoresForUser(
             @AuthenticationPrincipal UserDetailsImpl user,

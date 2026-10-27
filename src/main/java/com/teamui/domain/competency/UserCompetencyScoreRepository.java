@@ -20,4 +20,7 @@ public interface UserCompetencyScoreRepository extends JpaRepository<UserCompete
     Page<UserCompetencyScore> findAllByUserId(UUID userId, Pageable pageable);
 
     Optional<UserCompetencyScore> findByUserIdAndCompetencyId(UUID userId, UUID competencyId);
+
+    /** Number of ratings (self or lead) given for a competency. */
+    long countByCompetencyId(UUID competencyId);
 }
