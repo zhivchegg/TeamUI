@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError } from '../api/client';
-import { createMeeting, listLeadMeetings, listMeetingParticipants } from '../api/endpoints';
+import { errorText } from '../api/errors';
+import { createMeeting, listLeadMeetings, listMeetingParticipants, listParticipantMeetings } from '../api/endpoints';
 import type { Meeting, MeetingLevel, MeetingParticipant } from '../api/types';
 import { formatDateTime, localInputToIso, meetingLevelLabel, meetingStatusLabel } from '../format';
 
@@ -13,7 +13,8 @@ const PARTICIPANT_GROUPS: { level: MeetingLevel; label: string }[] = [
 ];
 
 export function MeetingsPage() {
-  const [meetings, setMeetings] = useState<Meeting[] | null>(null);
+  const [asParticipant, setAsParticipant] = useState<Meeting[] | null>(null);
+  const [asLead, setAsLead] = useState<Meeting[] | null>(null);
   const [participants, setParticipants] = useState<MeetingParticipant[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,18 +22,24 @@ export function MeetingsPage() {
   const [when, setWhen] = useState('');
   const [busy, setBusy] = useState(false);
 
-  function reload() {
+  function reloadLead() {
     listLeadMeetings()
-      .then((page) => setMeetings(page.content))
-      .catch(() => setError('Не удалось загрузить встречи'));
+      .then((page) => setAsLead(page.content))
+      .catch(() => setError('Не удалось загрузить встречи, которые вы ведёте'));
   }
 
   useEffect(() => {
-    reload();
+    listParticipantMeetings()
+      .then((page) => setAsParticipant(page.content))
+      .catch(() => setError('Не удалось загрузить ваши встречи'));
+    reloadLead();
     listMeetingParticipants()
       .then(setParticipants)
       .catch(() => setParticipants([]));
   }, []);
+
+  // Создавать встречи и вести их могут только пользователи, у которых есть с кем встречаться.
+  const canLead = participants !== null && participants.length > 0;
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -41,9 +48,9 @@ export function MeetingsPage() {
     try {
       await createMeeting({ participantId, scheduledDate: localInputToIso(when), status: 'PLANNED' });
       setWhen('');
-      reload();
+      reloadLead();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось создать встречу');
+      setError(errorText(err, 'Не удалось создать встречу.'));
     } finally {
       setBusy(false);
     }
@@ -54,77 +61,93 @@ export function MeetingsPage() {
       <section className="card">
         <h1>Встречи 1:1</h1>
         {error && <p role="alert" className="error">{error}</p>}
-        {meetings === null ? (
-          <p className="muted">Загрузка…</p>
-        ) : meetings.length === 0 ? (
-          <p className="muted">Встреч пока нет.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Участник</th>
-                <th>Уровень</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {meetings.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <Link to={`/meetings/${m.id}`}>{formatDateTime(m.scheduledDate)}</Link>
-                  </td>
-                  <td>{m.participantName}</td>
-                  <td>{meetingLevelLabel(m.level)}</td>
-                  <td>{meetingStatusLabel(m.status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </section>
 
       <section className="card">
-        <h2>Новая встреча</h2>
-        {participants === null ? (
-          <p className="muted">Загрузка…</p>
-        ) : participants.length === 0 ? (
-          <p className="muted">Нет людей, с которыми можно назначить встречу.</p>
-        ) : (
-          <form onSubmit={onCreate} className="stack">
-            <label>
-              Участник
-              <select required value={participantId} onChange={(e) => setParticipantId(e.target.value)}>
-                <option value="" disabled>
-                  Выберите участника
-                </option>
-                {PARTICIPANT_GROUPS.map((group) => {
-                  const items = participants.filter((p) => p.level === group.level);
-                  if (items.length === 0) {
-                    return null;
-                  }
-                  return (
-                    <optgroup key={group.level} label={group.label}>
-                      {items.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.fullName} — {p.scopeName}
-                        </option>
-                      ))}
-                    </optgroup>
-                  );
-                })}
-              </select>
-            </label>
-            <label>
-              Дата и время
-              <input type="datetime-local" required value={when} onChange={(e) => setWhen(e.target.value)} />
-            </label>
-            <button type="submit" disabled={busy || !participantId || !when}>
-              Создать
-            </button>
-          </form>
-        )}
+        <h2>Мои встречи</h2>
+        <MeetingTable meetings={asParticipant} view="participant" />
       </section>
+
+      {canLead && (
+        <>
+          <section className="card">
+            <h2>Встречи, которые я веду</h2>
+            <MeetingTable meetings={asLead} view="lead" />
+          </section>
+
+          <section className="card">
+            <h2>Новая встреча</h2>
+            {participants === null ? null : (
+              <form onSubmit={onCreate} className="stack">
+                <label>
+                  Участник
+                  <select required value={participantId} onChange={(e) => setParticipantId(e.target.value)}>
+                    <option value="" disabled>
+                      Выберите участника
+                    </option>
+                    {PARTICIPANT_GROUPS.map((group) => {
+                      const items = participants.filter((p) => p.level === group.level);
+                      if (items.length === 0) {
+                        return null;
+                      }
+                      return (
+                        <optgroup key={group.level} label={group.label}>
+                          {items.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.fullName} — {p.scopeName}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
+                  </select>
+                </label>
+                <label>
+                  Дата и время
+                  <input type="datetime-local" required value={when} onChange={(e) => setWhen(e.target.value)} />
+                </label>
+                <button type="submit" disabled={busy || !participantId || !when}>
+                  Создать
+                </button>
+              </form>
+            )}
+          </section>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Таблица встреч: участнику показываем ведущего, лиду показываем участника. */
+function MeetingTable({ meetings, view }: { meetings: Meeting[] | null; view: 'participant' | 'lead' }) {
+  if (meetings === null) {
+    return <p className="muted">Загрузка…</p>;
+  }
+  if (meetings.length === 0) {
+    return <p className="muted">Встреч пока нет.</p>;
+  }
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>{view === 'participant' ? 'Ведущий' : 'Участник'}</th>
+          <th>Уровень</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {meetings.map((m) => (
+          <tr key={m.id}>
+            <td>
+              <Link to={`/meetings/${m.id}`}>{formatDateTime(m.scheduledDate)}</Link>
+            </td>
+            <td>{view === 'participant' ? m.leadName : m.participantName}</td>
+            <td>{meetingLevelLabel(m.level)}</td>
+            <td>{meetingStatusLabel(m.status)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

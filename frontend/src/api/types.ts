@@ -41,8 +41,27 @@ export interface TeamMemberCard {
 export interface MeetingPreview {
   id: string;
   participantName: string;
+  leadName: string;
   scheduledDate: string;
   status: MeetingStatus;
+  energyScore: number | null;
+}
+
+/** Задача из блока «Мои действия» (com.teamui.dto.QuickActionDto). */
+export interface QuickAction {
+  id: string;
+  text: string;
+  ownerId: string;
+  dueDate: string | null;
+  overdue: boolean;
+  source: string;
+}
+
+/** Блок участника на дашборде (com.teamui.dto.MemberMetricsDto), без радара и событий. */
+export interface MemberMetrics {
+  lastMeetings: MeetingPreview[];
+  upcomingMeeting: MeetingPreview | null;
+  openActions: QuickAction[];
 }
 
 export interface TeamMiniSummary {
@@ -78,6 +97,9 @@ export interface Dashboard {
   userProfile: UserProfile;
   /** null, если пользователю не назначена роль в команде, кластере или стриме. */
   role: string | null;
+  /** Название команды для участника и лидов команды, иначе null. */
+  teamName: string | null;
+  memberMetrics: MemberMetrics | null;
   teamHealth: {
     teamName: string;
     upcomingMeetings: MeetingPreview[];
@@ -140,6 +162,15 @@ export interface CreateMeetingBody {
   participantId: string;
   scheduledDate: string;
   status?: MeetingStatus;
+}
+
+/** Тело PUT /api/meetings/{id}: меняет встречу автор. */
+export interface UpdateMeetingBody {
+  scheduledDate: string;
+  status: MeetingStatus;
+  energyScore: number | null;
+  energyNote: string | null;
+  version: number;
 }
 
 export interface UpdateNotesBody {

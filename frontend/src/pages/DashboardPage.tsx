@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getDashboard } from '../api/endpoints';
-import type { Dashboard } from '../api/types';
+import type { Dashboard, MeetingPreview } from '../api/types';
 import { formatDateTime, meetingStatusLabel } from '../format';
 
 export function DashboardPage() {
@@ -22,9 +22,13 @@ export function DashboardPage() {
   const team = data.teamHealth;
   const cluster = data.clusterOverview;
   const stream = data.streamOverview;
+  const member = data.role === 'TEAM_MEMBER' ? data.memberMetrics : null;
+  // Лиды остаются в составе команды, здесь они вынесены отдельно, чтобы было видно, кто ведёт команду.
+  const leads = team?.memberCards.filter((m) => m.role === 'TEAM_LEAD' || m.role === 'IT_LEAD') ?? [];
+
   let scope = 'Роль не назначена';
-  if (team) {
-    scope = `Команда: ${team.teamName}`;
+  if (data.teamName) {
+    scope = `Команда: ${data.teamName}`;
   } else if (cluster) {
     scope = `Кластер: ${cluster.name}`;
   } else if (stream) {
@@ -43,8 +47,75 @@ export function DashboardPage() {
         {data.role === null && <p className="muted">Обратитесь к администратору, чтобы вам назначили роль.</p>}
       </section>
 
+      {member && (
+        <>
+          <section className="card">
+            <h2>Моя следующая встреча</h2>
+            {member.upcomingMeeting ? (
+              <MeetingLine meeting={member.upcomingMeeting} />
+            ) : (
+              <p className="muted">
+                Нет запланированных встреч. <Link to="/meetings">Открыть встречи</Link>
+              </p>
+            )}
+          </section>
+
+          <section className="card">
+            <h2>Мои открытые действия</h2>
+            {member.openActions.length === 0 ? (
+              <p className="muted">Открытых действий нет.</p>
+            ) : (
+              <ul>
+                {member.openActions.map((a) => (
+                  <li key={a.id}>
+                    {a.text}
+                    {a.dueDate && (
+                      <span className={a.overdue ? 'error' : 'muted'}>
+                        {' '}
+                        — до {a.dueDate}
+                        {a.overdue ? ', просрочено' : ''}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="card">
+            <h2>Последние встречи</h2>
+            {member.lastMeetings.length === 0 ? (
+              <p className="muted">Проведённых встреч пока нет.</p>
+            ) : (
+              <ul>
+                {member.lastMeetings.map((m) => (
+                  <li key={m.id}>
+                    <MeetingLine meeting={m} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
+
       {team && (
         <>
+          <section className="card">
+            <h2>Лиды команды</h2>
+            {leads.length === 0 ? (
+              <p className="muted">Лиды не назначены.</p>
+            ) : (
+              <ul>
+                {leads.map((m) => (
+                  <li key={m.id}>
+                    <strong>{m.fullName}</strong> <span className="muted">— {roleLabel(m.role)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           <section className="card">
             <h2>Участники команды</h2>
             {team.memberCards.length === 0 ? (
@@ -63,7 +134,7 @@ export function DashboardPage() {
                   {team.memberCards.map((m) => (
                     <tr key={m.id}>
                       <td>{m.fullName}</td>
-                      <td>{m.role}</td>
+                      <td>{roleLabel(m.role)}</td>
                       <td>{m.openActionCount}</td>
                       <td>{m.lastOneOnOneDate ? formatDateTime(m.lastOneOnOneDate) : '—'}</td>
                     </tr>
@@ -161,5 +232,27 @@ export function DashboardPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/** Русское название роли в команде. Неизвестные роли выводим как есть. */
+function roleLabel(role: string): string {
+  const labels: Record<string, string> = {
+    TEAM_LEAD: 'Лид команды',
+    IT_LEAD: 'IT-лид команды',
+    TEAM_MEMBER: 'Участник',
+  };
+  return labels[role] ?? role;
+}
+
+/** Строка встречи со ссылкой на страницу встречи, ведущий и статус. */
+function MeetingLine({ meeting }: { meeting: MeetingPreview }) {
+  return (
+    <>
+      <Link to={`/meetings/${meeting.id}`}>
+        {formatDateTime(meeting.scheduledDate)}, с {meeting.leadName}
+      </Link>{' '}
+      <span className="muted">({meetingStatusLabel(meeting.status)})</span>
+    </>
   );
 }

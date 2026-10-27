@@ -124,7 +124,7 @@ public class DashboardService {
             }
             return new DashboardResponse(
                     profile, leaderRole, buildQuickActions(userId, leaderRole, null), null, null,
-                    streamOverview, clusterOverview
+                    streamOverview, clusterOverview, null
             );
         }
 
@@ -133,7 +133,7 @@ public class DashboardService {
         if (memberships.isEmpty()) {
             // No stream, cluster or team role: nothing to show, and no role is assigned
             return new DashboardResponse(
-                    profile, null, List.of(), null, null, null, null
+                    profile, null, List.of(), null, null, null, null, null
             );
         }
 
@@ -154,7 +154,8 @@ public class DashboardService {
             memberMetrics = buildMemberMetrics(user, team); // leads also see their own metrics
         }
 
-        return new DashboardResponse(profile, role, quickActions, memberMetrics, teamHealth, streamOverview, null);
+        return new DashboardResponse(profile, role, quickActions, memberMetrics, teamHealth, streamOverview, null,
+                team.getName());
     }
 
     private List<QuickActionDto> buildQuickActions(UUID userId, UserRole role, Team team) {

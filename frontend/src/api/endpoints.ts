@@ -8,6 +8,7 @@ import type {
   Meeting,
   MeetingParticipant,
   Page,
+  UpdateMeetingBody,
   UpdateNotesBody,
 } from './types';
 
@@ -22,8 +23,24 @@ export async function login(email: string, password: string): Promise<LoginResul
   return result;
 }
 
+/**
+ * Текущая попытка обновления. Refresh-токен одноразовый: второй параллельный запрос с той же
+ * cookie считается повторным использованием и отзывает все сессии пользователя. Поэтому
+ * параллельные вызовы делят один запрос.
+ */
+let refreshing: Promise<LoginResult | null> | null = null;
+
 /** Обновляет сессию по refresh-cookie. Возвращает null, если cookie нет или истекла. */
-export async function refreshSession(): Promise<LoginResult | null> {
+export function refreshSession(): Promise<LoginResult | null> {
+  if (!refreshing) {
+    refreshing = doRefresh().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
+async function doRefresh(): Promise<LoginResult | null> {
   try {
     const result = await apiFetch<LoginResult>('/api/auth/refresh', { method: 'POST' });
     setAccessToken(result.token);
@@ -52,6 +69,15 @@ export function getDashboard(): Promise<Dashboard> {
 
 export function listLeadMeetings(page = 0, size = 20): Promise<Page<Meeting>> {
   return apiFetch<Page<Meeting>>(`/api/meetings?asLead=true&page=${page}&size=${size}`);
+}
+
+/** Встречи, где пользователь участник (его 1:1 с лидом). */
+export function listParticipantMeetings(page = 0, size = 20): Promise<Page<Meeting>> {
+  return apiFetch<Page<Meeting>>(`/api/meetings?asLead=false&page=${page}&size=${size}`);
+}
+
+export function updateMeeting(id: string, body: UpdateMeetingBody): Promise<Meeting> {
+  return apiFetch<Meeting>(`/api/meetings/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
 export function listMeetingParticipants(): Promise<MeetingParticipant[]> {

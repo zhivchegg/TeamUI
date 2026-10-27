@@ -20,6 +20,7 @@ import java.util.UUID;
  * @param teamHealth      TEAM_LEAD / IT_LEAD view: upcoming meetings, team metrics, bus factor
  * @param streamOverview  STREAM_LEAD / STREAM_IT_LEAD view: aggregate metrics across clusters
  * @param clusterOverview CLUSTER_LEAD / CLUSTER_IT_LEAD view: health of the teams in one cluster
+ * @param teamName        name of the user's team for TEAM_MEMBER, TEAM_LEAD and IT_LEAD, otherwise null
  * @author TeamUI
  * @since 0.0.1
  */
@@ -30,5 +31,6 @@ public record DashboardResponse(
         MemberMetricsDto memberMetrics,
         TeamHealthDto teamHealth,
         StreamOverviewDto streamOverview,
-        ClusterSummaryDto clusterOverview
+        ClusterSummaryDto clusterOverview,
+        String teamName
 ) {}
