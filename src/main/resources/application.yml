@@ -40,8 +40,10 @@ spring:
 
 teamui:
   jwt:
-    secret: ${JWT_SECRET:ChangeThisSecretInProduction32CharsMin}
-    expiration-hours: 24
+    # Required, no default: the app refuses to start without JWT_SECRET (see JwtUtils)
+    secret: ${JWT_SECRET}
+    access-expiration-minutes: 15
+    refresh-expiration-days: 14
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
 
@@ -56,5 +58,5 @@ management:
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    com.teamui: DEBUG
+    org.springframework.security: INFO
+    com.teamui: INFO

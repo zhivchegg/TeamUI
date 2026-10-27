@@ -8,6 +8,7 @@ import com.teamui.domain.team.Team;
 import com.teamui.domain.user.User;
 import com.teamui.domain.user.UserRepository;
 import com.teamui.dto.*;
+import com.teamui.exception.NotFoundException;
 import com.teamui.security.service.UserDetailsImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -69,7 +70,7 @@ public class PulseSurveyService {
     @Transactional(readOnly = true)
     public PulseSurveyResponse getSurvey(UserDetailsImpl viewer, UUID surveyId) {
         PulseSurvey survey = pulseSurveyRepository.findById(surveyId)
-                .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
+                .orElseThrow(() -> new NotFoundException("Survey not found"));
 
         if (!canAccessSurvey(viewer, survey)) {
             throw new AccessDeniedException("Not allowed to view this survey");
@@ -84,7 +85,7 @@ public class PulseSurveyService {
     @Transactional
     public void deleteSurvey(UserDetailsImpl viewer, UUID surveyId) {
         PulseSurvey survey = pulseSurveyRepository.findById(surveyId)
-                .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
+                .orElseThrow(() -> new NotFoundException("Survey not found"));
 
         if (!canModifySurvey(viewer, survey)) {
             throw new AccessDeniedException("Not allowed to delete this survey");
@@ -198,7 +199,7 @@ public class PulseSurveyService {
         return teamMembershipRepository.findAllByTeamId(teamId, Pageable.unpaged())
                 .getContent().stream().findFirst()
                 .map(m -> m.getTeam())
-                .orElseThrow(() -> new IllegalArgumentException("Team not found"));
+                .orElseThrow(() -> new NotFoundException("Team not found"));
     }
 
     private boolean canAccessSurvey(UserDetailsImpl viewer, PulseSurvey survey) {

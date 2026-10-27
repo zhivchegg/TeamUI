@@ -12,6 +12,7 @@ import com.teamui.domain.user.UserRepository;
 import com.teamui.dto.CreateEventRequest;
 import com.teamui.dto.EventResponse;
 import com.teamui.dto.UpdateEventRequest;
+import com.teamui.exception.NotFoundException;
 import com.teamui.security.service.UserDetailsImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -95,7 +96,7 @@ public class EventService {
     @Transactional
     public EventResponse updateEvent(UserDetailsImpl user, UUID eventId, UpdateEventRequest request) {
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new NotFoundException("Event not found"));
 
         if (!canModifyEvent(user, event)) {
             throw new AccessDeniedException("Not allowed to update this event");
@@ -118,7 +119,7 @@ public class EventService {
     @Transactional
     public void deleteEvent(UserDetailsImpl user, UUID eventId) {
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new NotFoundException("Event not found"));
 
         if (!canModifyEvent(user, event)) {
             throw new AccessDeniedException("Not allowed to delete this event");
@@ -133,7 +134,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public EventResponse getEvent(UserDetailsImpl user, UUID eventId) {
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new NotFoundException("Event not found"));
 
         if (!canViewEvent(user, event)) {
             throw new AccessDeniedException("You do not have access to this event");

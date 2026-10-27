@@ -27,11 +27,15 @@ Self-hosted platform for managing support engineering and IT teams.
 ```bash
 # 1. Start PostgreSQL 16
 # 2. Run migrations (Flyway executes automatically on startup)
-# 3. Start application
+# 3. Set the JWT secret (required, at least 32 bytes; the app will not start without it)
+export JWT_SECRET="$(openssl rand -base64 48)"
+# 4. Start application
 ./mvnw spring-boot:run
 
 # API base URL: http://localhost:8080/api
 ```
+
+With Docker Compose, put the same variable in a `.env` file next to `docker-compose.yml` (it is git-ignored). See `.env.example`.
 
 ## Role Hierarchy
 

@@ -1,5 +1,7 @@
 package com.teamui.domain.meeting;
 
+import com.teamui.domain.cluster.Cluster;
+import com.teamui.domain.enums.MeetingLevel;
 import com.teamui.domain.enums.MeetingStatus;
 import com.teamui.domain.team.Team;
 import com.teamui.domain.user.User;
@@ -37,9 +39,19 @@ public class Meeting {
     @JoinColumn(name = "lead_id", nullable = false)
     private User lead;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "team_id", nullable = false)
+    /** Team of the meeting for TEAM and CLUSTER levels, empty for STREAM level. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
     private Team team;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MeetingLevel level = MeetingLevel.TEAM;
+
+    /** Cluster the meeting belongs to. For STREAM level it is the participant's cluster. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "cluster_id", nullable = false)
+    private Cluster cluster;
 
     @Column(name = "scheduled_date", nullable = false)
     private Instant scheduledDate;
@@ -85,6 +97,12 @@ public class Meeting {
 
     public Team getTeam() { return team; }
     public void setTeam(Team team) { this.team = team; }
+
+    public MeetingLevel getLevel() { return level; }
+    public void setLevel(MeetingLevel level) { this.level = level; }
+
+    public Cluster getCluster() { return cluster; }
+    public void setCluster(Cluster cluster) { this.cluster = cluster; }
 
     public Instant getScheduledDate() { return scheduledDate; }
     public void setScheduledDate(Instant scheduledDate) { this.scheduledDate = scheduledDate; }

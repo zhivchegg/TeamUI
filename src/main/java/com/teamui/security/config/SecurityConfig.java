@@ -19,6 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -43,16 +44,19 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final AuthenticationEntryPoint authEntryPoint;
+    private final AccessDeniedHandler accessDeniedHandler;
 
     @Value("${teamui.cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                            UserDetailsService userDetailsService,
-                           AuthenticationEntryPoint authEntryPoint) {
+                           AuthenticationEntryPoint authEntryPoint,
+                           AccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.authEntryPoint = authEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     /**
@@ -63,7 +67,9 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(authEntryPoint))
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint(authEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
@@ -74,9 +80,8 @@ public class SecurityConfig {
                 // Role-based endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/stream/**").hasAnyRole("STREAM_LEAD", "STREAM_IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/meetings/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/meetings/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/meetings/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
+                // Meeting writes are not gated by a single role: leads of every level write meetings,
+                // and MeetingService checks the 1:1 relation (see resolveScope) and authorship.
                 .requestMatchers(HttpMethod.POST, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasAnyRole("TEAM_LEAD", "IT_LEAD", "ADMIN")

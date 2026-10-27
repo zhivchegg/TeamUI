@@ -18,9 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
- * Authentication business logic: login, registration via invite tokens.
+ * Authentication business logic: login, registration via invite tokens,
+ * access-token renewal with refresh-token rotation, and logout.
  *
  * @author TeamUI
  * @since 0.0.1
@@ -33,28 +35,42 @@ public class AuthService {
     private final TeamMembershipRepository teamMembershipRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final RefreshTokenService refreshTokenService;
+    private final LeadershipResolver leadershipResolver;
 
     public AuthService(UserRepository userRepository,
                         InviteRepository inviteRepository,
                         TeamMembershipRepository teamMembershipRepository,
                         PasswordEncoder passwordEncoder,
-                        JwtUtils jwtUtils) {
+                        JwtUtils jwtUtils,
+                        RefreshTokenService refreshTokenService,
+                        LeadershipResolver leadershipResolver) {
         this.userRepository = userRepository;
         this.inviteRepository = inviteRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
+        this.refreshTokenService = refreshTokenService;
+        this.leadershipResolver = leadershipResolver;
     }
 
     /**
-     * Authenticates a user by email and password, issuing a JWT.
+     * Result of a successful authentication.
+     *
+     * @param session      access token and user info, returned in the response body
+     * @param refreshToken raw refresh token, returned to the client only as an httpOnly cookie
+     */
+    public record AuthResult(LoginResponse session, String refreshToken) {}
+
+    /**
+     * Authenticates a user by email and password.
      *
      * @param request login credentials
-     * @return token response with user info
+     * @return new session
      * @throws BadCredentialsException if credentials are invalid
      */
-    @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
+    @Transactional
+    public AuthResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email().trim().toLowerCase())
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
@@ -66,30 +82,18 @@ public class AuthService {
             throw new BadCredentialsException("Account is deactivated");
         }
 
-        // Resolve primary role from memberships (first active role found)
-        String role = resolvePrimaryRole(user);
-
-        String token = jwtUtils.generateToken(user.getId(), user.getEmail(), role);
-
-        return new LoginResponse(
-                token,
-                "Bearer",
-                user.getId(),
-                user.getEmail(),
-                role,
-                86400L // 24 hours in seconds
-        );
+        return issueSession(user, resolvePrimaryRole(user));
     }
 
     /**
      * Completes self-registration using an invitation token.
      *
      * @param request registration details including invite token
-     * @return token response for the newly created user
+     * @return new session for the newly created user
      * @throws IllegalArgumentException if token is invalid, expired, or already used
      */
     @Transactional
-    public LoginResponse register(RegisterRequest request) {
+    public AuthResult register(RegisterRequest request) {
         Invite invite = inviteRepository.findByToken(request.token())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired invitation token"));
 
@@ -127,20 +131,63 @@ public class AuthService {
         invite.setUsedAt(Instant.now());
         inviteRepository.save(invite);
 
-        String role = invite.getRole().name();
-        String token = jwtUtils.generateToken(user.getId(), user.getEmail(), role);
+        return issueSession(user, invite.getRole().name());
+    }
 
-        return new LoginResponse(
-                token,
+    /**
+     * Exchanges a refresh token for a new access token and a new refresh token.
+     *
+     * <p>Deliberately not transactional: the refresh token is consumed in its own
+     * transaction, so a reuse attempt that fails here still commits the revocation of all
+     * the user's tokens.</p>
+     *
+     * @param rawRefreshToken the refresh token from the client cookie
+     * @return new session with a rotated refresh token
+     * @throws BadCredentialsException if the token is invalid or the account is deactivated
+     */
+    public AuthResult refresh(String rawRefreshToken) {
+        UUID userId = refreshTokenService.consume(rawRefreshToken);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+
+        if (!user.isActive()) {
+            throw new BadCredentialsException("Account is deactivated");
+        }
+
+        return issueSession(user, resolvePrimaryRole(user));
+    }
+
+    /**
+     * Revokes the refresh token of the current session.
+     *
+     * @param rawRefreshToken the refresh token from the client cookie, may be null
+     */
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    private AuthResult issueSession(User user, String role) {
+        String accessToken = jwtUtils.generateToken(user.getId(), user.getEmail(), role);
+
+        LoginResponse session = new LoginResponse(
+                accessToken,
                 "Bearer",
                 user.getId(),
                 user.getEmail(),
                 role,
-                86400L
+                jwtUtils.accessTokenTtlSeconds()
         );
+
+        return new AuthResult(session, refreshTokenService.issue(user));
     }
 
     private String resolvePrimaryRole(User user) {
+        var stream = leadershipResolver.find(user.getId());
+        if (stream.isPresent()) {
+            return stream.get().role().name();
+        }
         var memberships = teamMembershipRepository.findAllByUserId(user.getId(), Pageable.ofSize(1));
         if (!memberships.isEmpty()) {
             return memberships.getContent().getFirst().getRole().name();

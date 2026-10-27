@@ -4,6 +4,7 @@ import com.teamui.dto.*;
 import com.teamui.security.service.UserDetailsImpl;
 import com.teamui.service.BusFactorService;
 import jakarta.validation.Valid;
+import com.teamui.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -78,11 +79,11 @@ public class BusFactorController {
      * Delete a system and all its expertise links.
      */
     @DeleteMapping("/{systemId}")
-    public ResponseEntity<Void> delete(
+    public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetailsImpl user,
             @PathVariable UUID systemId) {
         busFactorService.deleteSystem(user, systemId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
@@ -115,12 +116,12 @@ public class BusFactorController {
      * Remove a user's expertise from a system.
      */
     @DeleteMapping("/{systemId}/expertise/{userId}")
-    public ResponseEntity<Void> removeExpertise(
+    public ResponseEntity<ApiResponse<Void>> removeExpertise(
             @AuthenticationPrincipal UserDetailsImpl user,
             @PathVariable UUID systemId,
             @PathVariable UUID userId) {
         busFactorService.removeExpertise(user, systemId, userId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**

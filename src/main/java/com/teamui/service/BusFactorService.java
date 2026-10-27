@@ -13,6 +13,7 @@ import com.teamui.domain.team.TeamRepository;
 import com.teamui.domain.user.User;
 import com.teamui.domain.user.UserRepository;
 import com.teamui.dto.*;
+import com.teamui.exception.NotFoundException;
 import com.teamui.security.service.UserDetailsImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -83,7 +84,7 @@ public class BusFactorService {
     @Transactional
     public SystemResponse updateSystem(UserDetailsImpl user, UUID systemId, UpdateSystemRequest request) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamLead(user.getId(), sys.getTeam().getId()) && !isAdmin(user)) {
             throw new AccessDeniedException("Only team leads may update systems");
@@ -102,7 +103,7 @@ public class BusFactorService {
     @Transactional
     public void deleteSystem(UserDetailsImpl user, UUID systemId) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamLead(user.getId(), sys.getTeam().getId()) && !isAdmin(user)) {
             throw new AccessDeniedException("Only team leads may delete systems");
@@ -120,7 +121,7 @@ public class BusFactorService {
     @Transactional(readOnly = true)
     public SystemResponse getSystem(UserDetailsImpl user, UUID systemId) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamMember(user.getId(), sys.getTeam().getId())) {
             throw new AccessDeniedException("Not a member of this team");
@@ -152,7 +153,7 @@ public class BusFactorService {
     @Transactional
     public ExpertiseResponse assignExpertise(UserDetailsImpl actor, UUID systemId, ExpertiseRequest request) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamLead(actor.getId(), sys.getTeam().getId()) && !isAdmin(actor)) {
             throw new AccessDeniedException("Only team leads may assign expertise");
@@ -180,7 +181,7 @@ public class BusFactorService {
     @Transactional
     public void removeExpertise(UserDetailsImpl actor, UUID systemId, UUID userId) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamLead(actor.getId(), sys.getTeam().getId()) && !isAdmin(actor)) {
             throw new AccessDeniedException("Only team leads may remove expertise");
@@ -198,7 +199,7 @@ public class BusFactorService {
                                                           UUID systemId,
                                                           Pageable pageable) {
         ITSystem sys = systemRepository.findById(systemId)
-                .orElseThrow(() -> new IllegalArgumentException("System not found"));
+                .orElseThrow(() -> new NotFoundException("System not found"));
 
         if (!isTeamMember(user.getId(), sys.getTeam().getId())) {
             throw new AccessDeniedException("Not a member of this team");

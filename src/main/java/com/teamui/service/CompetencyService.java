@@ -6,6 +6,7 @@ import com.teamui.domain.membership.TeamMembershipRepository;
 import com.teamui.domain.user.User;
 import com.teamui.domain.user.UserRepository;
 import com.teamui.dto.*;
+import com.teamui.exception.NotFoundException;
 import com.teamui.security.service.UserDetailsImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -141,7 +142,7 @@ public class CompetencyService {
         }
 
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Competency> competencies = competencyRepository.findAllByOrderBySortOrderAsc();
 
@@ -175,7 +176,7 @@ public class CompetencyService {
         com.teamui.domain.team.Team team = teamMembershipRepository.findAllByTeamId(teamId, Pageable.unpaged())
                 .getContent().stream().findFirst()
                 .map(m -> m.getTeam())
-                .orElseThrow(() -> new IllegalArgumentException("Team not found"));
+                .orElseThrow(() -> new NotFoundException("Team not found"));
 
         List<Competency> competencies = competencyRepository.findAllByOrderBySortOrderAsc();
 
@@ -294,7 +295,7 @@ public class CompetencyService {
                 .orElseGet(() -> {
                     UserCompetencyScore s = new UserCompetencyScore();
                     User u = userRepository.findById(userId)
-                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                            .orElseThrow(() -> new NotFoundException("User not found"));
                     Competency c = competencyRepository.findById(competencyId)
                             .orElseThrow(() -> new IllegalArgumentException("Competency not found"));
                     s.setUser(u);
@@ -385,9 +386,9 @@ public class CompetencyService {
         }
 
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Competency competency = competencyRepository.findById(competencyId)
-                .orElseThrow(() -> new IllegalArgumentException("Competency not found"));
+                .orElseThrow(() -> new NotFoundException("Competency not found"));
 
         List<UserCompetencyScoreHistory> history = historyRepository
                 .findAllByUserIdAndCompetencyIdOrderByScoredAtDesc(targetUserId, competencyId, Pageable.unpaged())
@@ -438,11 +439,11 @@ public class CompetencyService {
         }
 
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         com.teamui.domain.team.Team team = teamMembershipRepository.findAllByTeamId(teamId, Pageable.unpaged())
                 .getContent().stream().findFirst()
                 .map(m -> m.getTeam())
-                .orElseThrow(() -> new IllegalArgumentException("Team not found"));
+                .orElseThrow(() -> new NotFoundException("Team not found"));
 
         List<Competency> competencies = competencyRepository.findAllByOrderBySortOrderAsc();
 

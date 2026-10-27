@@ -2,8 +2,10 @@ package com.teamui.web;
 
 import com.teamui.dto.*;
 import com.teamui.security.service.UserDetailsImpl;
+import com.teamui.service.MeetingParticipantService;
 import com.teamui.service.MeetingService;
 import jakarta.validation.Valid;
+import com.teamui.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -32,14 +34,24 @@ import java.util.UUID;
 public class MeetingController {
 
     private final MeetingService meetingService;
+    private final MeetingParticipantService participantService;
 
-    public MeetingController(MeetingService meetingService) {
+    public MeetingController(MeetingService meetingService, MeetingParticipantService participantService) {
         this.meetingService = meetingService;
+        this.participantService = participantService;
     }
 
     // ------------------------------------------------------------------
     // Meeting CRUD
     // ------------------------------------------------------------------
+
+    /**
+     * People the caller can schedule a 1:1 with, each with the level of the meeting.
+     */
+    @GetMapping("/participants")
+    public ResponseEntity<List<MeetingParticipantDto>> participants(@AuthenticationPrincipal UserDetailsImpl lead) {
+        return ResponseEntity.ok(participantService.listParticipants(lead.getId()));
+    }
 
     /**
      * Schedule a new 1:1 meeting.
@@ -77,11 +89,11 @@ public class MeetingController {
      * Delete a meeting.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
+    public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetailsImpl lead,
             @PathVariable UUID id) {
         meetingService.deleteMeeting(lead, id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
@@ -159,18 +171,18 @@ public class MeetingController {
             @PathVariable UUID meetingId,
             @PathVariable UUID actionId,
             @RequestBody @Valid ActionRequest request) {
-        return ResponseEntity.ok(meetingService.updateAction(user, actionId, request));
+        return ResponseEntity.ok(meetingService.updateAction(user, meetingId, actionId, request));
     }
 
     /**
      * Delete an action item.
      */
     @DeleteMapping("/{meetingId}/actions/{actionId}")
-    public ResponseEntity<Void> deleteAction(
+    public ResponseEntity<ApiResponse<Void>> deleteAction(
             @AuthenticationPrincipal UserDetailsImpl user,
             @PathVariable UUID meetingId,
             @PathVariable UUID actionId) {
-        meetingService.deleteAction(user, actionId);
-        return ResponseEntity.noContent().build();
+        meetingService.deleteAction(user, meetingId, actionId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

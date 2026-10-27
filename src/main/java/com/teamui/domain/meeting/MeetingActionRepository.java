@@ -3,10 +3,12 @@ package com.teamui.domain.meeting;
 import com.teamui.domain.enums.ActionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,6 +22,12 @@ import java.util.UUID;
 public interface MeetingActionRepository extends JpaRepository<MeetingAction, UUID> {
 
     List<MeetingAction> findAllByMeetingId(UUID meetingId);
+
+    /**
+     * Actions for several meetings in one query, to avoid one query per meeting in list responses.
+     */
+    @EntityGraph(attributePaths = {"owner", "meeting"})
+    List<MeetingAction> findAllByMeetingIdIn(Collection<UUID> meetingIds);
 
     Page<MeetingAction> findAllByOwnerIdOrderByDueDateAsc(UUID ownerId, Pageable pageable);
 

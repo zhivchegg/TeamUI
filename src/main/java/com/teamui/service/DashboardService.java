@@ -44,7 +44,8 @@ import java.util.stream.Collectors;
 /**
  * Builds personalized dashboards based on the authenticated user's role.
  *
- * <p>Delivers different views for TEAM_MEMBER, TEAM_LEAD, STREAM_LEAD, and ADMIN.</p>
+ * <p>Delivers different views for TEAM_MEMBER, TEAM_LEAD, STREAM_LEAD and CLUSTER_LEAD.
+ * A user with no such role gets a dashboard without a role.</p>
  *
  * @author TeamUI
  * @since 0.0.1
@@ -65,6 +66,7 @@ public class DashboardService {
     private final StreamRepository streamRepository;
     private final ITSystemRepository systemRepository;
     private final SystemExpertiseRepository expertiseRepository;
+    private final LeadershipResolver leadershipResolver;
 
     public DashboardService(UserRepository userRepository,
                              TeamMembershipRepository membershipRepository,
@@ -78,7 +80,8 @@ public class DashboardService {
                              ClusterRepository clusterRepository,
                              StreamRepository streamRepository,
                              ITSystemRepository systemRepository,
-                             SystemExpertiseRepository expertiseRepository) {
+                             SystemExpertiseRepository expertiseRepository,
+                             LeadershipResolver leadershipResolver) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.meetingRepository = meetingRepository;
@@ -92,6 +95,7 @@ public class DashboardService {
         this.streamRepository = streamRepository;
         this.systemRepository = systemRepository;
         this.expertiseRepository = expertiseRepository;
+        this.leadershipResolver = leadershipResolver;
     }
 
     /**
@@ -106,12 +110,30 @@ public class DashboardService {
                 user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(), user.getAvatarUrl()
         );
 
+        // Stream and cluster roles come from the streams and clusters tables and take precedence over team roles
+        var leadership = leadershipResolver.find(userId);
+        if (leadership.isPresent()) {
+            UserRole leaderRole = leadership.get().role();
+            StreamOverviewDto streamOverview = null;
+            ClusterSummaryDto clusterOverview = null;
+            if (leadership.get().stream() != null) {
+                streamOverview = buildStreamOverview(leadership.get().stream().getName(),
+                        clusterRepository.findAllByStreamId(leadership.get().stream().getId()));
+            } else {
+                clusterOverview = buildClusterSummary(leadership.get().cluster());
+            }
+            return new DashboardResponse(
+                    profile, leaderRole, buildQuickActions(userId, leaderRole, null), null, null,
+                    streamOverview, clusterOverview
+            );
+        }
+
         // Resolve membership and role
         var memberships = membershipRepository.findAllByUserId(userId, Pageable.ofSize(1));
         if (memberships.isEmpty()) {
-            // Admin or stream-level role with no team membership
+            // No stream, cluster or team role: nothing to show, and no role is assigned
             return new DashboardResponse(
-                    profile, UserRole.ADMIN, List.of(), null, null, null
+                    profile, null, List.of(), null, null, null, null
             );
         }
 
@@ -130,11 +152,9 @@ public class DashboardService {
         } else if (role == UserRole.TEAM_LEAD || role == UserRole.IT_LEAD) {
             teamHealth = buildTeamHealth(user, team);
             memberMetrics = buildMemberMetrics(user, team); // leads also see their own metrics
-        } else if (role == UserRole.STREAM_LEAD || role == UserRole.STREAM_IT_LEAD) {
-            streamOverview = buildStreamOverview(user, team);
         }
 
-        return new DashboardResponse(profile, role, quickActions, memberMetrics, teamHealth, streamOverview);
+        return new DashboardResponse(profile, role, quickActions, memberMetrics, teamHealth, streamOverview, null);
     }
 
     private List<QuickActionDto> buildQuickActions(UUID userId, UserRole role, Team team) {
@@ -280,63 +300,68 @@ public class DashboardService {
         );
     }
 
-    private StreamOverviewDto buildStreamOverview(User user, Team team) {
-        // Navigate up: team -> cluster -> stream
-        Cluster cluster = team.getCluster();
-        Stream stream = cluster.getStream();
+    /**
+     * Aggregate view over every cluster of a stream.
+     *
+     * @param streamName name of the stream
+     * @param clusters   clusters of the stream
+     * @return aggregate metrics for the stream
+     */
+    private StreamOverviewDto buildStreamOverview(String streamName, List<Cluster> clusters) {
+        List<ClusterSummaryDto> clusterSummaries = clusters.stream().map(this::buildClusterSummary).toList();
+        int totalTeams = clusterSummaries.stream().mapToInt(ClusterSummaryDto::teamCount).sum();
+        int totalMembers = clusterSummaries.stream().mapToInt(ClusterSummaryDto::memberCount).sum();
+        long teamsAtRisk = clusterSummaries.stream()
+                .flatMap(c -> c.teamSummaries().stream())
+                .filter(TeamMiniSummaryDto::atRisk)
+                .count();
 
-        List<Cluster> clusters = clusterRepository.findAllByStreamId(stream.getId());
+        return new StreamOverviewDto(
+                streamName, clusterSummaries, totalTeams, totalMembers, (int) teamsAtRisk
+        );
+    }
 
-        int totalTeams = 0;
-        int totalMembers = 0;
-        int teamsAtRisk = 0;
-        List<ClusterSummaryDto> clusterSummaries = new ArrayList<>();
+    /**
+     * Health of one cluster: its teams, their members and bus factor issues.
+     *
+     * @param c the cluster
+     * @return summary of the cluster
+     */
+    private ClusterSummaryDto buildClusterSummary(Cluster c) {
+        List<Team> teams = teamRepository.findAllByClusterId(c.getId());
+        int clusterMemberCount = 0;
+        long clusterOverdue = 0;
+        long clusterBusIssues = 0;
+        List<TeamMiniSummaryDto> teamSummaries = new ArrayList<>();
 
-        for (Cluster c : clusters) {
-            List<Team> teams = teamRepository.findAllByClusterId(c.getId());
-            int clusterTeamCount = teams.size();
-            int clusterMemberCount = 0;
-            long clusterOverdue = 0;
-            long clusterBusIssues = 0;
-            List<TeamMiniSummaryDto> teamSummaries = new ArrayList<>();
+        for (Team t : teams) {
+            var members = membershipRepository.findAllByTeamId(t.getId(), Pageable.unpaged()).getContent();
+            int memberCount = members.size();
+            clusterMemberCount += memberCount;
 
-            for (Team t : teams) {
-                var members = membershipRepository.findAllByTeamId(t.getId(), Pageable.unpaged()).getContent();
-                int memberCount = members.size();
-                clusterMemberCount += memberCount;
-                totalMembers += memberCount;
+            // Overdue actions (simplified: count OPEN/IN_PROGRESS past due)
+            long overdue = 0; // Would need more complex query in production
+            clusterOverdue += overdue;
 
-                // Overdue actions (simplified: count OPEN/IN_PROGRESS past due)
-                long overdue = 0; // Would need more complex query in production
-                clusterOverdue += overdue;
+            // Bus factor issues
+            var systems = systemRepository.findAllByTeamId(t.getId());
+            long busIssues = systems.stream().filter(s -> {
+                var expertises = expertiseRepository.findAllBySystemId(s.getId(), Pageable.unpaged()).getContent();
+                long experts = expertises.stream().filter(e -> e.getLevel() == ExpertiseLevel.EXPERT).count();
+                return experts == 0 || (experts == 1 && s.getCriticality().ordinal() <= Criticality.HIGH.ordinal());
+            }).count();
+            clusterBusIssues += busIssues;
 
-                // Bus factor issues
-                var systems = systemRepository.findAllByTeamId(t.getId());
-                long busIssues = systems.stream().filter(s -> {
-                    var expertises = expertiseRepository.findAllBySystemId(s.getId(), Pageable.unpaged()).getContent();
-                    long experts = expertises.stream().filter(e -> e.getLevel() == ExpertiseLevel.EXPERT).count();
-                    return experts == 0 || (experts == 1 && s.getCriticality().ordinal() <= Criticality.HIGH.ordinal());
-                }).count();
-                clusterBusIssues += busIssues;
+            boolean atRisk = overdue > 0 || busIssues > 0;
 
-                boolean atRisk = overdue > 0 || busIssues > 0;
-                if (atRisk) teamsAtRisk++;
-
-                teamSummaries.add(new TeamMiniSummaryDto(
-                        t.getId(), t.getName(), memberCount, overdue, null, atRisk
-                ));
-            }
-
-            totalTeams += clusterTeamCount;
-
-            clusterSummaries.add(new ClusterSummaryDto(
-                    c.getId(), c.getName(), clusterTeamCount, clusterMemberCount,
-                    clusterOverdue, clusterBusIssues, teamSummaries
+            teamSummaries.add(new TeamMiniSummaryDto(
+                    t.getId(), t.getName(), memberCount, overdue, null, atRisk
             ));
         }
 
-        return new StreamOverviewDto(
-                stream.getName(), clusterSummaries, totalTeams, totalMembers, teamsAtRisk
+        return new ClusterSummaryDto(
+                c.getId(), c.getName(), teams.size(), clusterMemberCount,
+                clusterOverdue, clusterBusIssues, teamSummaries
         );
     }
 

@@ -4,6 +4,7 @@ import com.teamui.dto.*;
 import com.teamui.security.service.UserDetailsImpl;
 import com.teamui.service.PulseSurveyService;
 import jakarta.validation.Valid;
+import com.teamui.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -66,11 +67,11 @@ public class PulseSurveyController {
      * Delete a pulse survey.
      */
     @DeleteMapping("/{surveyId}")
-    public ResponseEntity<Void> delete(
+    public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetailsImpl user,
             @PathVariable UUID surveyId) {
         pulseSurveyService.deleteSurvey(user, surveyId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**

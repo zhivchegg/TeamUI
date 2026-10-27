@@ -1,6 +1,7 @@
 package com.teamui.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.teamui.dto.ApiResponse;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,8 +11,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.Map;
 
 /**
  * Custom entry point that returns JSON error responses for unauthenticated requests.
@@ -31,14 +30,7 @@ public class AuthEntryPointJwt implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-        Map<String, Object> body = Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", HttpServletResponse.SC_UNAUTHORIZED,
-                "error", "Unauthorized",
-                "message", authException.getMessage(),
-                "path", request.getRequestURI()
-        );
-
-        new ObjectMapper().writeValue(response.getOutputStream(), body);
+        new ObjectMapper().writeValue(response.getOutputStream(),
+                ApiResponse.error(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage()));
     }
 }

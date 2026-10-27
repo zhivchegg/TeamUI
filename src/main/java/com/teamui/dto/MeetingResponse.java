@@ -1,5 +1,6 @@
 package com.teamui.dto;
 
+import com.teamui.domain.enums.MeetingLevel;
 import com.teamui.domain.enums.MeetingStatus;
 
 import java.time.Instant;
@@ -17,7 +18,9 @@ import java.util.UUID;
  * @param participantName participant full name
  * @param leadId          author (lead) user id
  * @param leadName        author full name
- * @param teamId          owning team id
+ * @param teamId          team id for TEAM and CLUSTER levels, null for STREAM level
+ * @param level           TEAM, CLUSTER or STREAM
+ * @param clusterId       cluster the meeting belongs to
  * @param scheduledDate   when the meeting is/was scheduled
  * @param status          lifecycle state
  * @param energyScore     optional 1-5 score
@@ -38,6 +41,8 @@ public record MeetingResponse(
         UUID leadId,
         String leadName,
         UUID teamId,
+        MeetingLevel level,
+        UUID clusterId,
         Instant scheduledDate,
         MeetingStatus status,
         Short energyScore,

@@ -22,4 +22,10 @@ public interface ClusterRepository extends JpaRepository<Cluster, UUID> {
      * @return clusters ordered by name
      */
     List<Cluster> findAllByStreamId(UUID streamId);
+
+    /** Clusters this user leads as cluster lead. */
+    List<Cluster> findAllByClusterLeadId(UUID userId);
+
+    /** Clusters this user leads as IT lead. */
+    List<Cluster> findAllByClusterItLeadId(UUID userId);
 }

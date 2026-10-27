@@ -26,6 +26,12 @@ public enum UserRole {
     /** Stream IT Lead: aggregate view only, technical counterpart to Stream Lead. */
     STREAM_IT_LEAD,
 
+    /** Cluster Lead: holds 1:1 meetings with the leads of the teams in the cluster. */
+    CLUSTER_LEAD,
+
+    /** Cluster IT Lead: technical counterpart to Cluster Lead in the same cluster. */
+    CLUSTER_IT_LEAD,
+
     /** Full platform access including user management and configuration. */
     ADMIN
 }

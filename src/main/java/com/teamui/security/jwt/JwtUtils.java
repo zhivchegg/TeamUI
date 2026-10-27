@@ -2,6 +2,7 @@ package com.teamui.security.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,18 +25,48 @@ import java.util.UUID;
 @Component
 public class JwtUtils {
 
-    @Value("${teamui.jwt.secret:ChangeThisSecretInProduction32CharsMin}")
+    private static final int MIN_SECRET_BYTES = 32;
+
+    /** Placeholder that used to be the default; a deployment that still has it is not secure. */
+    private static final String FORMER_DEFAULT_SECRET = "ChangeThisSecretInProduction32CharsMin";
+
+    @Value("${teamui.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${teamui.jwt.expiration-hours:24}")
-    private int jwtExpirationHours;
+    @Value("${teamui.jwt.access-expiration-minutes:15}")
+    private int accessExpirationMinutes;
+
+    /**
+     * Fails startup when the secret is missing, too short for HS-256, or the old placeholder,
+     * instead of failing on the first login.
+     *
+     * @throws IllegalStateException if the secret is unsafe to use
+     */
+    @PostConstruct
+    void validateSecret() {
+        if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("JWT_SECRET must be set and at least 32 bytes long");
+        }
+        if (FORMER_DEFAULT_SECRET.equals(jwtSecret)) {
+            throw new IllegalStateException("JWT_SECRET is the former placeholder value; set a new secret");
+        }
+    }
 
     private SecretKey key() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
-     * Generates a signed JWT for the given user.
+     * Access token lifetime in seconds, as reported to the client in {@code expiresIn}.
+     *
+     * @return lifetime in seconds
+     */
+    public long accessTokenTtlSeconds() {
+        return accessExpirationMinutes * 60L;
+    }
+
+    /**
+     * Generates a signed short-lived access JWT for the given user.
      *
      * @param userId the user's UUID
      * @param email  the user's email
@@ -44,7 +75,7 @@ public class JwtUtils {
      */
     public String generateToken(UUID userId, String email, String role) {
         Instant now = Instant.now();
-        Instant expiry = now.plus(jwtExpirationHours, ChronoUnit.HOURS);
+        Instant expiry = now.plus(accessExpirationMinutes, ChronoUnit.MINUTES);
 
         return Jwts.builder()
                 .subject(userId.toString())

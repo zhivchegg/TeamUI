@@ -6,6 +6,7 @@ import com.teamui.dto.UpdateEventRequest;
 import com.teamui.security.service.UserDetailsImpl;
 import com.teamui.service.EventService;
 import jakarta.validation.Valid;
+import com.teamui.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -79,11 +80,11 @@ public class EventController {
      * Delete a timeline event.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
+    public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetailsImpl user,
             @PathVariable UUID id) {
         eventService.deleteEvent(user, id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // ------------------------------------------------------------------
