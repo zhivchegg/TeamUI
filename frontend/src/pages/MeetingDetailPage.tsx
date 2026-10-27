@@ -1,27 +1,49 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { errorText } from '../api/errors';
-import { createAction, getMeeting, updateAction, updateMeeting, updateNotes } from '../api/endpoints';
+import {
+  createAction,
+  deleteMeeting,
+  getMeeting,
+  updateAction,
+  updateAgenda,
+  updateMeeting,
+  updateNotes,
+} from '../api/endpoints';
 import type { ActionItem, ActionStatus, Meeting, MeetingStatus } from '../api/types';
-import { actionStatusLabel, formatDateTime, meetingStatusLabel } from '../format';
+import {
+  actionStatusLabel,
+  formatDateTime,
+  isoToLocalInput,
+  localInputToIso,
+  meetingStatusLabel,
+} from '../format';
 
 const ACTION_STATUSES: ActionStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'CANCELLED'];
 const MEETING_STATUSES: MeetingStatus[] = ['PLANNED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'];
 
 export function MeetingDetailPage() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const viewerId = user?.userId ?? '';
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const [scheduledLocal, setScheduledLocal] = useState('');
+  const [meetingStatus, setMeetingStatus] = useState<MeetingStatus>('PLANNED');
+  const [energy, setEnergy] = useState('');
+  const [paramsSaved, setParamsSaved] = useState(false);
+
+  const [agendaText, setAgendaText] = useState('');
+  const [agendaSaved, setAgendaSaved] = useState(false);
 
   const [sharedNotes, setSharedNotes] = useState('');
   const [privateNotes, setPrivateNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
-
-  const [meetingStatus, setMeetingStatus] = useState<MeetingStatus>('PLANNED');
 
   const [actionText, setActionText] = useState('');
   const [actionOwnerId, setActionOwnerId] = useState('');
@@ -29,9 +51,12 @@ export function MeetingDetailPage() {
 
   function applyMeeting(m: Meeting) {
     setMeeting(m);
+    setScheduledLocal(isoToLocalInput(m.scheduledDate));
+    setMeetingStatus(m.status);
+    setEnergy(m.energyScore === null ? '' : String(m.energyScore));
+    setAgendaText(m.participantAgenda ?? '');
     setSharedNotes(m.sharedNotes ?? '');
     setPrivateNotes(m.privateNotes ?? '');
-    setMeetingStatus(m.status);
     setActionOwnerId((current) => current || m.participantId);
   }
 
@@ -45,11 +70,61 @@ export function MeetingDetailPage() {
     return error ? <p role="alert" className="error">{error}</p> : <p className="muted">Загрузка…</p>;
   }
 
-  // Права по ролям в этой встрече. Серверные проверки те же: участник не может менять заметки
-  // и добавлять действия, а лид, не являющийся автором, не меняет личные заметки и статус встречи.
+  // Права по ролям в этой встрече. Серверные проверки те же: участник не меняет заметки, действия
+  // и параметры встречи, а лид, не являющийся автором, не меняет личные заметки и параметры.
   const isParticipant = meeting.participantId === viewerId;
   const isAuthor = meeting.leadId === viewerId;
   const isLead = !isParticipant;
+
+  async function onSaveParams(e: FormEvent) {
+    e.preventDefault();
+    if (!meeting) return;
+    setError(null);
+    setParamsSaved(false);
+    const iso = localInputToIso(scheduledLocal);
+    if (meetingStatus === 'PLANNED' && new Date(iso) < new Date()) {
+      setError('Запланированную встречу нельзя перенести на прошедшую дату.');
+      return;
+    }
+    try {
+      applyMeeting(
+        await updateMeeting(meeting.id, {
+          scheduledDate: iso,
+          status: meetingStatus,
+          energyScore: energy ? Number(energy) : null,
+          energyNote: meeting.energyNote,
+          version: meeting.version,
+        }),
+      );
+      setParamsSaved(true);
+    } catch (err) {
+      setError(errorText(err, 'Не удалось сохранить параметры встречи.'));
+    }
+  }
+
+  async function onDelete() {
+    if (!meeting) return;
+    setError(null);
+    try {
+      await deleteMeeting(meeting.id);
+      navigate('/meetings');
+    } catch (err) {
+      setError(errorText(err, 'Не удалось удалить встречу.'));
+    }
+  }
+
+  async function onSaveAgenda(e: FormEvent) {
+    e.preventDefault();
+    if (!meeting) return;
+    setError(null);
+    setAgendaSaved(false);
+    try {
+      applyMeeting(await updateAgenda(meeting.id, { agenda: agendaText || null, version: meeting.version }));
+      setAgendaSaved(true);
+    } catch (err) {
+      setError(errorText(err, 'Не удалось сохранить повестку.'));
+    }
+  }
 
   async function onSaveNotes(e: FormEvent) {
     e.preventDefault();
@@ -67,25 +142,6 @@ export function MeetingDetailPage() {
       setNotesSaved(true);
     } catch (err) {
       setError(errorText(err, 'Не удалось сохранить заметки.'));
-    }
-  }
-
-  async function onSaveMeetingStatus(e: FormEvent) {
-    e.preventDefault();
-    if (!meeting) return;
-    setError(null);
-    try {
-      applyMeeting(
-        await updateMeeting(meeting.id, {
-          scheduledDate: meeting.scheduledDate,
-          status: meetingStatus,
-          energyScore: meeting.energyScore,
-          energyNote: meeting.energyNote,
-          version: meeting.version,
-        }),
-      );
-    } catch (err) {
-      setError(errorText(err, 'Не удалось изменить статус встречи.'));
     }
   }
 
@@ -136,24 +192,67 @@ export function MeetingDetailPage() {
 
       {isAuthor && (
         <section className="card">
-          <h2>Статус встречи</h2>
-          <form onSubmit={onSaveMeetingStatus} className="row">
-            <label>
-              Статус
-              <select value={meetingStatus} onChange={(e) => setMeetingStatus(e.target.value as MeetingStatus)}>
-                {MEETING_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {meetingStatusLabel(s)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" disabled={meetingStatus === meeting.status}>
-              Сохранить статус
-            </button>
+          <h2>Параметры встречи</h2>
+          <form onSubmit={onSaveParams} className="stack">
+            <div className="row">
+              <label>
+                Дата и время
+                <input
+                  type="datetime-local"
+                  required
+                  value={scheduledLocal}
+                  onChange={(e) => setScheduledLocal(e.target.value)}
+                />
+              </label>
+              <label>
+                Статус встречи
+                <select value={meetingStatus} onChange={(e) => setMeetingStatus(e.target.value as MeetingStatus)}>
+                  {MEETING_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {meetingStatusLabel(s)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Самочувствие участника (1–5)
+                <select value={energy} onChange={(e) => setEnergy(e.target.value)}>
+                  <option value="">Не указано</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="row">
+              <button type="submit">Сохранить встречу</button>
+              {paramsSaved && <span className="muted">Сохранено</span>}
+            </div>
           </form>
         </section>
       )}
+
+      <section className="card">
+        <h2>Повестка участника</h2>
+        {isParticipant ? (
+          <form onSubmit={onSaveAgenda} className="stack">
+            <label>
+              Вопросы и темы, которые вы хотите обсудить
+              <textarea rows={4} value={agendaText} onChange={(e) => setAgendaText(e.target.value)} />
+            </label>
+            <div className="row">
+              <button type="submit">Сохранить повестку</button>
+              {agendaSaved && <span className="muted">Сохранено</span>}
+            </div>
+          </form>
+        ) : meeting.participantAgenda ? (
+          <p className="pre-wrap">{meeting.participantAgenda}</p>
+        ) : (
+          <p className="muted">Участник ещё не добавил вопросы.</p>
+        )}
+      </section>
 
       <section className="card">
         <h2>Заметки</h2>
@@ -236,6 +335,27 @@ export function MeetingDetailPage() {
           </form>
         )}
       </section>
+
+      {isAuthor && (
+        <section className="card">
+          <h2>Удаление встречи</h2>
+          <p className="muted">Встреча, её заметки и действия будут удалены без возможности восстановления.</p>
+          {confirmingDelete ? (
+            <div className="row">
+              <button type="button" className="danger" onClick={() => void onDelete()}>
+                Да, удалить встречу
+              </button>
+              <button type="button" onClick={() => setConfirmingDelete(false)}>
+                Отмена
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="danger" onClick={() => setConfirmingDelete(true)}>
+              Удалить встречу
+            </button>
+          )}
+        </section>
+      )}
     </div>
   );
 }

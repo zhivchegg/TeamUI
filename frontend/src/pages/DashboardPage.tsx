@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getDashboard } from '../api/endpoints';
-import type { Dashboard, MeetingPreview } from '../api/types';
-import { formatDateTime, meetingStatusLabel } from '../format';
+import { getDashboard, listLeadMeetings } from '../api/endpoints';
+import type { Dashboard, Meeting, MeetingPreview } from '../api/types';
+import { criticalityLabel, formatDateTime, meetingStatusLabel } from '../format';
 
 export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [leadMeetings, setLeadMeetings] = useState<Meeting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getDashboard().then(setData).catch(() => setError('Не удалось загрузить дашборд'));
+    listLeadMeetings(0, 50)
+      .then((page) => setLeadMeetings(page.content))
+      .catch(() => setLeadMeetings([]));
   }, []);
 
   if (error) {
@@ -23,8 +27,14 @@ export function DashboardPage() {
   const cluster = data.clusterOverview;
   const stream = data.streamOverview;
   const member = data.role === 'TEAM_MEMBER' ? data.memberMetrics : null;
+  const isLead = data.role !== null && data.role !== 'TEAM_MEMBER';
   // Лиды остаются в составе команды, здесь они вынесены отдельно, чтобы было видно, кто ведёт команду.
   const leads = team?.memberCards.filter((m) => m.role === 'TEAM_LEAD' || m.role === 'IT_LEAD') ?? [];
+  const namesById = new Map((team?.memberCards ?? []).map((m) => [m.id, m.fullName]));
+  const upcomingAsLead = (leadMeetings ?? [])
+    .filter((m) => m.status === 'PLANNED' && new Date(m.scheduledDate) > new Date())
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+    .slice(0, 5);
 
   let scope = 'Роль не назначена';
   if (data.teamName) {
@@ -99,8 +109,78 @@ export function DashboardPage() {
         </>
       )}
 
+      {isLead && (
+        <section className="card">
+          <h2>Мои ближайшие встречи</h2>
+          {leadMeetings === null ? (
+            <p className="muted">Загрузка…</p>
+          ) : upcomingAsLead.length === 0 ? (
+            <p className="muted">
+              Нет запланированных встреч. <Link to="/meetings">Открыть встречи</Link>
+            </p>
+          ) : (
+            <ul>
+              {upcomingAsLead.map((m) => (
+                <li key={m.id}>
+                  <Link to={`/meetings/${m.id}`}>
+                    {formatDateTime(m.scheduledDate)}, {m.participantName}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {team && (
         <>
+          <section className="card">
+            <h2>Сводка команды</h2>
+            <p>
+              Энергия команды:{' '}
+              {team.teamEnergyAverage === null ? (
+                <span className="muted">нет данных опросов</span>
+              ) : (
+                <strong>{team.teamEnergyAverage.toFixed(1)} из 5</strong>
+              )}
+            </p>
+            <p>
+              Просроченных действий: <strong>{team.overdueActions.length}</strong>
+            </p>
+          </section>
+
+          {team.overdueActions.length > 0 && (
+            <section className="card">
+              <h2>Просроченные действия</h2>
+              <ul>
+                {team.overdueActions.map((a) => (
+                  <li key={a.id}>
+                    {a.text} <span className="muted">— {namesById.get(a.ownerId) ?? 'участник'}, до {a.dueDate}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="card">
+            <h2>Риски потери экспертизы</h2>
+            {team.busFactorAlerts.length === 0 ? (
+              <p className="muted">Рисков нет.</p>
+            ) : (
+              <ul>
+                {team.busFactorAlerts.map((s) => (
+                  <li key={s.systemId}>
+                    <strong>{s.systemName}</strong>{' '}
+                    <span className="muted">
+                      ({criticalityLabel(s.criticality)}), экспертов: {s.expertCount} из {s.totalMembers}
+                      {s.expertNames.length > 0 ? `: ${s.expertNames.join(', ')}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           <section className="card">
             <h2>Лиды команды</h2>
             {leads.length === 0 ? (
@@ -145,7 +225,7 @@ export function DashboardPage() {
           </section>
 
           <section className="card">
-            <h2>Ближайшие встречи</h2>
+            <h2>Ближайшие встречи команды</h2>
             {team.upcomingMeetings.length === 0 ? (
               <p className="muted">
                 Нет запланированных встреч. <Link to="/meetings">Открыть встречи</Link>
@@ -163,6 +243,21 @@ export function DashboardPage() {
               </ul>
             )}
           </section>
+
+          <section className="card">
+            <h2>Последние события</h2>
+            {team.unacknowledgedEvents.length === 0 ? (
+              <p className="muted">Событий пока нет.</p>
+            ) : (
+              <ul>
+                {team.unacknowledgedEvents.map((e) => (
+                  <li key={e.id}>
+                    {e.title} <span className="muted">— {formatDateTime(e.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </>
       )}
 
@@ -171,7 +266,7 @@ export function DashboardPage() {
           <h2>Команды кластера</h2>
           <p className="muted">
             Команд: {cluster.teamCount}, участников: {cluster.memberCount}, команд в зоне риска:{' '}
-            {cluster.teamSummaries.filter((t) => t.atRisk).length}
+            {cluster.teamSummaries.filter((t) => t.atRisk).length}, просроченных действий: {cluster.overdueActions}
           </p>
           {cluster.teamSummaries.length === 0 ? (
             <p className="muted">В кластере пока нет команд.</p>
@@ -181,6 +276,7 @@ export function DashboardPage() {
                 <tr>
                   <th>Команда</th>
                   <th>Участников</th>
+                  <th>Просрочено</th>
                   <th>Зона риска</th>
                 </tr>
               </thead>
@@ -189,6 +285,7 @@ export function DashboardPage() {
                   <tr key={t.id}>
                     <td>{t.name}</td>
                     <td>{t.memberCount}</td>
+                    <td>{t.overdueActions}</td>
                     <td>{t.atRisk ? 'Да' : 'Нет'}</td>
                   </tr>
                 ))}
@@ -214,6 +311,7 @@ export function DashboardPage() {
                   <th>Кластер</th>
                   <th>Команд</th>
                   <th>Участников</th>
+                  <th>Просрочено</th>
                   <th>Команд в зоне риска</th>
                 </tr>
               </thead>
@@ -223,6 +321,7 @@ export function DashboardPage() {
                     <td>{c.name}</td>
                     <td>{c.teamCount}</td>
                     <td>{c.memberCount}</td>
+                    <td>{c.overdueActions}</td>
                     <td>{c.teamSummaries.filter((t) => t.atRisk).length}</td>
                   </tr>
                 ))}

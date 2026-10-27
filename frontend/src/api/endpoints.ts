@@ -7,7 +7,9 @@ import type {
   LoginResult,
   Meeting,
   MeetingParticipant,
+  NotificationItem,
   Page,
+  UpdateAgendaBody,
   UpdateMeetingBody,
   UpdateNotesBody,
 } from './types';
@@ -74,6 +76,32 @@ export function listLeadMeetings(page = 0, size = 20): Promise<Page<Meeting>> {
 /** Встречи, где пользователь участник (его 1:1 с лидом). */
 export function listParticipantMeetings(page = 0, size = 20): Promise<Page<Meeting>> {
   return apiFetch<Page<Meeting>>(`/api/meetings?asLead=false&page=${page}&size=${size}`);
+}
+
+export function deleteMeeting(id: string): Promise<void> {
+  return apiFetch<void>(`/api/meetings/${id}`, { method: 'DELETE' });
+}
+
+// ----- Уведомления -----
+
+export function listNotifications(page = 0, size = 20): Promise<Page<NotificationItem>> {
+  return apiFetch<Page<NotificationItem>>(`/api/notifications?page=${page}&size=${size}`);
+}
+
+export function getUnreadCount(): Promise<{ count: number }> {
+  return apiFetch<{ count: number }>('/api/notifications/unread-count');
+}
+
+export function markNotificationRead(id: string): Promise<void> {
+  return apiFetch<void>(`/api/notifications/${id}/read`, { method: 'POST' });
+}
+
+export function markAllNotificationsRead(): Promise<void> {
+  return apiFetch<void>('/api/notifications/read-all', { method: 'POST' });
+}
+
+export function updateAgenda(id: string, body: UpdateAgendaBody): Promise<Meeting> {
+  return apiFetch<Meeting>(`/api/meetings/${id}/agenda`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
 export function updateMeeting(id: string, body: UpdateMeetingBody): Promise<Meeting> {

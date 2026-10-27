@@ -203,3 +203,25 @@ textarea {
     padding: 0.75rem;
   }
 }
+
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
+.notice {
+  border-left: 3px solid #12b76a;
+  padding-left: 0.5rem;
+}
+
+.danger {
+  background: #d92d20;
+  color: #ffffff;
+}
+
+.unread {
+  font-weight: 600;
+}
+
+.notifications li {
+  margin: 0.25rem 0;
+}

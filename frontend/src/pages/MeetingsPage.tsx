@@ -3,7 +3,13 @@ import { Link } from 'react-router-dom';
 import { errorText } from '../api/errors';
 import { createMeeting, listLeadMeetings, listMeetingParticipants, listParticipantMeetings } from '../api/endpoints';
 import type { Meeting, MeetingLevel, MeetingParticipant } from '../api/types';
-import { formatDateTime, localInputToIso, meetingLevelLabel, meetingStatusLabel } from '../format';
+import {
+  formatDateTime,
+  isoToLocalInput,
+  localInputToIso,
+  meetingLevelLabel,
+  meetingStatusLabel,
+} from '../format';
 
 /** Группы участников в выпадающем списке, в порядке уровней. */
 const PARTICIPANT_GROUPS: { level: MeetingLevel; label: string }[] = [
@@ -17,6 +23,7 @@ export function MeetingsPage() {
   const [asLead, setAsLead] = useState<Meeting[] | null>(null);
   const [participants, setParticipants] = useState<MeetingParticipant[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [participantId, setParticipantId] = useState('');
   const [when, setWhen] = useState('');
@@ -44,9 +51,18 @@ export function MeetingsPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+    const iso = localInputToIso(when);
+    if (new Date(iso) < new Date()) {
+      setError('Дата встречи уже прошла. Выберите время в будущем.');
+      return;
+    }
     setBusy(true);
     try {
-      await createMeeting({ participantId, scheduledDate: localInputToIso(when), status: 'PLANNED' });
+      await createMeeting({ participantId, scheduledDate: iso, status: 'PLANNED' });
+      const picked = participants?.find((p) => p.id === participantId);
+      setNotice(`Встреча с ${picked?.fullName ?? 'участником'} назначена на ${formatDateTime(iso)}.`);
+      setParticipantId('');
       setWhen('');
       reloadLead();
     } catch (err) {
@@ -61,6 +77,7 @@ export function MeetingsPage() {
       <section className="card">
         <h1>Встречи 1:1</h1>
         {error && <p role="alert" className="error">{error}</p>}
+        {notice && <p role="status" className="notice">{notice}</p>}
       </section>
 
       <section className="card">
@@ -104,7 +121,13 @@ export function MeetingsPage() {
                 </label>
                 <label>
                   Дата и время
-                  <input type="datetime-local" required value={when} onChange={(e) => setWhen(e.target.value)} />
+                  <input
+                    type="datetime-local"
+                    required
+                    min={isoToLocalInput(new Date().toISOString())}
+                    value={when}
+                    onChange={(e) => setWhen(e.target.value)}
+                  />
                 </label>
                 <button type="submit" disabled={busy || !participantId || !when}>
                   Создать

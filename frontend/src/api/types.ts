@@ -93,6 +93,48 @@ export interface StreamOverview {
   teamsAtRisk: number;
 }
 
+/** Риск потери экспертизы по системе (com.teamui.dto.BusFactorAlertDto). */
+export interface BusFactorAlert {
+  systemId: string;
+  systemName: string;
+  criticality: string;
+  expertCount: number;
+  advancedCount: number;
+  totalMembers: number;
+  atRisk: boolean;
+  expertNames: string[];
+}
+
+/** Событие из таймлайна (com.teamui.dto.TimelineEventPreviewDto). */
+export interface TimelineEvent {
+  id: string;
+  eventType: string;
+  title: string;
+  category: string;
+  impactLevel: string;
+  createdAt: string;
+}
+
+/** Сводка команды для лидов (com.teamui.dto.TeamHealthDto). */
+export interface TeamHealth {
+  teamName: string;
+  upcomingMeetings: MeetingPreview[];
+  overdueActions: QuickAction[];
+  memberCards: TeamMemberCard[];
+  busFactorAlerts: BusFactorAlert[];
+  teamEnergyAverage: number | null;
+  unacknowledgedEvents: TimelineEvent[];
+}
+
+/** Уведомление пользователя (com.teamui.dto.NotificationResponse). */
+export interface NotificationItem {
+  id: string;
+  text: string;
+  meetingId: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface Dashboard {
   userProfile: UserProfile;
   /** null, если пользователю не назначена роль в команде, кластере или стриме. */
@@ -100,11 +142,7 @@ export interface Dashboard {
   /** Название команды для участника и лидов команды, иначе null. */
   teamName: string | null;
   memberMetrics: MemberMetrics | null;
-  teamHealth: {
-    teamName: string;
-    upcomingMeetings: MeetingPreview[];
-    memberCards: TeamMemberCard[];
-  } | null;
+  teamHealth: TeamHealth | null;
   streamOverview: StreamOverview | null;
   clusterOverview: ClusterSummary | null;
 }
@@ -136,6 +174,8 @@ export interface Meeting {
   energyNote: string | null;
   sharedNotes: string | null;
   privateNotes: string | null;
+  /** Вопросы участника к встрече. Видят участник и лиды. */
+  participantAgenda: string | null;
   actions: ActionItem[];
   version: number;
 }
@@ -162,6 +202,12 @@ export interface CreateMeetingBody {
   participantId: string;
   scheduledDate: string;
   status?: MeetingStatus;
+}
+
+/** Тело PUT /api/meetings/{id}/agenda: повестку пишет только участник. */
+export interface UpdateAgendaBody {
+  agenda: string | null;
+  version: number;
 }
 
 /** Тело PUT /api/meetings/{id}: меняет встречу автор. */
