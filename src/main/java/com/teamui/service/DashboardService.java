@@ -207,9 +207,10 @@ public class DashboardService {
         }).toList();
 
         // Last meetings
-        var meetings = meetingRepository.findAllByParticipantIdOrderByScheduledDateDesc(user.getId(), pageable);
+        // Only meetings that took place: the status filter is applied in the query, before the page limit
+        var meetings = meetingRepository.findAllByParticipantIdAndStatusOrderByScheduledDateDesc(
+                user.getId(), MeetingStatus.COMPLETED, pageable);
         List<MeetingPreviewDto> lastMeetings = meetings.getContent().stream()
-                .filter(m -> m.getStatus() == MeetingStatus.COMPLETED)
                 .map(this::toMeetingPreview)
                 .toList();
 
@@ -238,16 +239,17 @@ public class DashboardService {
 
     private TeamHealthDto buildTeamHealth(User lead, Team team) {
         Instant now = Instant.now();
-        Instant nextWeek = now.plus(7, ChronoUnit.DAYS);
 
         // Team members
         var members = membershipRepository.findAllByTeamId(team.getId(), Pageable.unpaged()).getContent();
 
-        // Planned meetings of the team in the next 7 days
+        // Planned meetings of the team from now on, the nearest first
         List<Meeting> upcomingMeetings = meetingRepository.findAllByTeamIdOrderByScheduledDateDesc(
                 team.getId(), Pageable.unpaged()).getContent().stream()
                 .filter(m -> m.getStatus() == MeetingStatus.PLANNED)
-                .filter(m -> m.getScheduledDate().isAfter(now) && m.getScheduledDate().isBefore(nextWeek))
+                .filter(m -> m.getScheduledDate().isAfter(now))
+                .sorted(Comparator.comparing(Meeting::getScheduledDate))
+                .limit(10)
                 .toList();
 
         // Overdue actions of all team members, the oldest first

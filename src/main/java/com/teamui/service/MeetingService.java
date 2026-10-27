@@ -284,6 +284,9 @@ public class MeetingService {
         if (!meeting.getParticipant().getId().equals(user.getId())) {
             throw new AccessDeniedException("Only the participant may edit the agenda");
         }
+        if (meeting.getStatus() == MeetingStatus.CANCELLED || meeting.getStatus() == MeetingStatus.NO_SHOW) {
+            throw new IllegalArgumentException("The agenda cannot be changed for a cancelled or missed meeting");
+        }
         if (meeting.getVersion() == null || !meeting.getVersion().equals(request.version())) {
             throw new ObjectOptimisticLockingFailureException(Meeting.class, meetingId);
         }

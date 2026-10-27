@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import com.teamui.security.service.UserDetailsImpl;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -46,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwt != null && jwtUtils.isTokenValid(jwt)) {
                 String email = jwtUtils.extractEmail(jwt);
 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                UserDetails userDetails = withTokenRole(userDetailsService.loadUserByUsername(email), jwt);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
@@ -64,6 +65,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * The role is the one issued at login, which is resolved from leadership and team memberships.
+     * The user loaded by email has no membership data, so its role would be a placeholder.
+     */
+    private UserDetails withTokenRole(UserDetails loaded, String jwt) {
+        String role = jwtUtils.extractRole(jwt);
+        if (role == null || !(loaded instanceof UserDetailsImpl details)) {
+            return loaded;
+        }
+        return new UserDetailsImpl(details.getUser(), role);
     }
 
     /**

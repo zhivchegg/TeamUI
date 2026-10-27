@@ -44,4 +44,9 @@ public interface MeetingRepository extends JpaRepository<Meeting, UUID> {
 
     @EntityGraph(attributePaths = {"participant", "lead", "team"})
     Optional<Meeting> findTopByParticipantIdAndStatusOrderByScheduledDateDesc(UUID participantId, MeetingStatus status);
+
+    /** Meetings of a participant in one status, the latest first. The page size limits the result. */
+    @EntityGraph(attributePaths = {"participant", "lead", "team"})
+    Page<Meeting> findAllByParticipantIdAndStatusOrderByScheduledDateDesc(
+            UUID participantId, MeetingStatus status, Pageable pageable);
 }
