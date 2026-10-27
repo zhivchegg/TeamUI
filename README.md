@@ -59,3 +59,8 @@ See inline Javadoc on controllers:
 1. `V1__init.sql` — full schema + seed data (7 competencies)
 2. `V2__optimistic_locking.sql` — version columns
 3. `V3__competency_history.sql` — score snapshots
+
+## Известные вопросы
+
+- **`TEAMUI_TRAINING_GUIDE.md`** лежит в репозитории с исходного коммита. Для сборки и запуска он не нужен, в Docker-образ не попадает (`.dockerignore`). Решено пока оставить файл в репозитории; если нужно убрать, это отдельный коммит с удалением.
+- **`frontend/vite.config.ts`** в блоке `test` ссылается на `src/test/setup.ts`. Файла в репозитории нет, потому что тесты фронтенда не коммитятся. На `vite build` и на продукт это не влияет, читает конфиг только Vitest. Варианты: вернуть тесты в репозиторий или убрать блок `test` из конфига.
