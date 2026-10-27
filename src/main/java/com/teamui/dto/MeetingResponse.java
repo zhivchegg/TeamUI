@@ -27,6 +27,7 @@ import java.util.UUID;
  * @param energyNote      optional description
  * @param sharedNotes     notes visible to both leads (may be null if caller has no right)
  * @param privateNotes    notes visible only to author (may be null if caller has no right)
+ * @param participantAgenda questions the participant prepared, visible to the participant and the leads
  * @param actions         action items created during this meeting
  * @param version         optimistic-lock version
  * @param createdAt       when the record was created
@@ -49,6 +50,7 @@ public record MeetingResponse(
         String energyNote,
         String sharedNotes,
         String privateNotes,
+        String participantAgenda,
         List<ActionResponse> actions,
         Long version,
         Instant createdAt,

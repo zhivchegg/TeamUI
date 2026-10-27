@@ -2,6 +2,7 @@ package com.teamui.service;
 
 import com.teamui.domain.cluster.Cluster;
 import com.teamui.domain.enums.ActionStatus;
+import com.teamui.domain.enums.MeetingStatus;
 import com.teamui.domain.enums.MeetingLevel;
 import com.teamui.domain.enums.UserRole;
 import com.teamui.domain.meeting.Meeting;
@@ -53,6 +54,7 @@ public class MeetingService {
     private final UserRepository userRepository;
     private final TeamMembershipRepository teamMembershipRepository;
     private final LeadershipResolver leadershipResolver;
+    private final NotificationService notificationService;
 
     /** Roles that count as leading a team when viewing meeting notes. */
     private static final List<UserRole> LEAD_ROLES = List.of(UserRole.TEAM_LEAD, UserRole.IT_LEAD);
@@ -61,12 +63,14 @@ public class MeetingService {
                            MeetingActionRepository actionRepository,
                            UserRepository userRepository,
                            TeamMembershipRepository teamMembershipRepository,
-                           LeadershipResolver leadershipResolver) {
+                           LeadershipResolver leadershipResolver,
+                           NotificationService notificationService) {
         this.meetingRepository = meetingRepository;
         this.actionRepository = actionRepository;
         this.userRepository = userRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.leadershipResolver = leadershipResolver;
+        this.notificationService = notificationService;
     }
 
     // ------------------------------------------------------------------
@@ -97,6 +101,8 @@ public class MeetingService {
         meeting.setStatus(request.status() != null ? request.status() : com.teamui.domain.enums.MeetingStatus.PLANNED);
 
         Meeting saved = meetingRepository.save(meeting);
+        notificationService.notify(participant, lead.getId(), saved,
+                "Назначена встреча: " + fullName(lead.getUser()));
         return toFullResponse(saved, lead);
     }
 
@@ -121,12 +127,23 @@ public class MeetingService {
             throw new ObjectOptimisticLockingFailureException(Meeting.class, meetingId);
         }
 
+        boolean rescheduled = !meeting.getScheduledDate().equals(request.scheduledDate());
+        MeetingStatus previousStatus = meeting.getStatus();
+
         meeting.setScheduledDate(request.scheduledDate());
         meeting.setStatus(request.status());
         meeting.setEnergyScore(request.energyScore());
         meeting.setEnergyNote(request.energyNote());
 
         Meeting updated = meetingRepository.save(meeting);
+        if (rescheduled) {
+            notificationService.notify(updated.getParticipant(), lead.getId(), updated,
+                    "Встреча перенесена: " + fullName(lead.getUser()));
+        }
+        if (previousStatus != request.status()) {
+            notificationService.notify(updated.getParticipant(), lead.getId(), updated,
+                    "Статус встречи изменён: " + meetingStatusText(request.status()));
+        }
         return toFullResponse(updated, lead);
     }
 
@@ -144,6 +161,9 @@ public class MeetingService {
         if (!meeting.getLead().getId().equals(lead.getId())) {
             throw new AccessDeniedException("Only the meeting author may delete it");
         }
+
+        notificationService.notify(meeting.getParticipant(), lead.getId(), null,
+                "Встреча с " + fullName(meeting.getLead()) + " удалена");
 
         actionRepository.findAllByMeetingId(meetingId)
                 .forEach(actionRepository::delete);
@@ -248,6 +268,38 @@ public class MeetingService {
     }
 
     // ------------------------------------------------------------------
+    /**
+     * Update the participant's agenda for a meeting. Only the participant writes it.
+     *
+     * @param user      requesting user, must be the participant
+     * @param meetingId target meeting
+     * @param request   agenda with optimistic-lock version
+     * @return updated meeting
+     */
+    @Transactional
+    public MeetingResponse updateAgenda(UserDetailsImpl user, UUID meetingId, UpdateAgendaRequest request) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new NotFoundException("Meeting not found"));
+
+        if (!meeting.getParticipant().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Only the participant may edit the agenda");
+        }
+        if (meeting.getVersion() == null || !meeting.getVersion().equals(request.version())) {
+            throw new ObjectOptimisticLockingFailureException(Meeting.class, meetingId);
+        }
+
+        String agenda = request.agenda() == null || request.agenda().isBlank() ? null : request.agenda().trim();
+        meeting.setParticipantAgenda(agenda);
+
+        Meeting updated = meetingRepository.save(meeting);
+        if (agenda != null) {
+            notificationService.notify(updated.getLead(), user.getId(), updated,
+                    fullName(updated.getParticipant()) + " обновил(а) повестку");
+        }
+        return toFullResponse(updated, user);
+    }
+
+    // ------------------------------------------------------------------
     // Actions
     // ------------------------------------------------------------------
 
@@ -279,6 +331,7 @@ public class MeetingService {
         action.setStatus(request.status() != null ? request.status() : ActionStatus.OPEN);
 
         MeetingAction saved = actionRepository.save(action);
+        notificationService.notify(owner, user.getId(), meeting, "Вам назначено действие: " + saved.getText());
         return toActionResponse(saved);
     }
 
@@ -297,6 +350,7 @@ public class MeetingService {
             throw new AccessDeniedException("Not allowed to update this action");
         }
 
+        ActionStatus previousStatus = action.getStatus();
         action.setText(request.text().trim());
         action.setDueDate(request.dueDate());
         if (request.status() != null) {
@@ -304,6 +358,13 @@ public class MeetingService {
         }
 
         MeetingAction updated = actionRepository.save(action);
+        if (request.status() != null && request.status() != previousStatus) {
+            // The owner changed it: tell the lead. A lead changed it: tell the owner.
+            boolean changedByOwner = action.getOwner().getId().equals(user.getId());
+            User recipient = changedByOwner ? action.getMeeting().getLead() : action.getOwner();
+            notificationService.notify(recipient, user.getId(), action.getMeeting(),
+                    "Статус действия «" + updated.getText() + "»: " + actionStatusText(request.status()));
+        }
         return toActionResponse(updated);
     }
 
@@ -498,6 +559,7 @@ public class MeetingService {
                 m.getEnergyNote(),
                 sharedNotes,
                 privateNotes,
+                m.getParticipantAgenda(),
                 actions,
                 m.getVersion(),
                 m.getCreatedAt(),
@@ -518,6 +580,25 @@ public class MeetingService {
                 a.getCreatedAt(),
                 a.getUpdatedAt()
         );
+    }
+
+    /** Russian status names for notification texts, which are shown to users as is. */
+    private static String meetingStatusText(MeetingStatus status) {
+        return switch (status) {
+            case PLANNED -> "Запланирована";
+            case COMPLETED -> "Проведена";
+            case NO_SHOW -> "Не явился";
+            case CANCELLED -> "Отменена";
+        };
+    }
+
+    private static String actionStatusText(ActionStatus status) {
+        return switch (status) {
+            case OPEN -> "Открыто";
+            case IN_PROGRESS -> "В работе";
+            case DONE -> "Готово";
+            case CANCELLED -> "Отменено";
+        };
     }
 
     private String fullName(User user) {

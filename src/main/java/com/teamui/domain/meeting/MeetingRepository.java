@@ -41,4 +41,7 @@ public interface MeetingRepository extends JpaRepository<Meeting, UUID> {
 
     @EntityGraph(attributePaths = {"participant", "lead", "team"})
     Optional<Meeting> findTopByParticipantIdAndStatusOrderByScheduledDateAsc(UUID participantId, MeetingStatus status);
+
+    @EntityGraph(attributePaths = {"participant", "lead", "team"})
+    Optional<Meeting> findTopByParticipantIdAndStatusOrderByScheduledDateDesc(UUID participantId, MeetingStatus status);
 }

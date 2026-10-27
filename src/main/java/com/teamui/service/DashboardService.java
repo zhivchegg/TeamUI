@@ -53,6 +53,9 @@ import java.util.stream.Collectors;
 @Service
 public class DashboardService {
 
+    /** Statuses of action items that still need attention. */
+    private static final List<ActionStatus> OPEN_STATUSES = List.of(ActionStatus.OPEN, ActionStatus.IN_PROGRESS);
+
     private final UserRepository userRepository;
     private final TeamMembershipRepository membershipRepository;
     private final MeetingRepository meetingRepository;
@@ -216,11 +219,12 @@ public class DashboardService {
         MeetingPreviewDto upcoming = upcomingOpt.map(this::toMeetingPreview).orElse(null);
 
         // Open actions
-        var openActions = actionRepository.findAllByOwnerIdAndStatusOrderByDueDateAsc(
-                user.getId(), ActionStatus.OPEN, pageable);
+        var openActions = actionRepository.findAllByOwnerIdAndStatusInOrderByDueDateAsc(
+                user.getId(), OPEN_STATUSES, pageable);
         List<QuickActionDto> actions = openActions.getContent().stream()
                 .map(a -> new QuickActionDto(a.getId(), a.getText(), a.getOwner().getId(),
-                        a.getDueDate(), false, "1:1 Action"))
+                        a.getDueDate(), a.getDueDate() != null && a.getDueDate().isBefore(LocalDate.now()),
+                        "1:1 Action"))
                 .toList();
 
         // Recent events
@@ -233,31 +237,36 @@ public class DashboardService {
     }
 
     private TeamHealthDto buildTeamHealth(User lead, Team team) {
-        Pageable pageable = PageRequest.of(0, 10);
         Instant now = Instant.now();
         Instant nextWeek = now.plus(7, ChronoUnit.DAYS);
 
         // Team members
         var members = membershipRepository.findAllByTeamId(team.getId(), Pageable.unpaged()).getContent();
 
-        // Upcoming meetings in next 7 days
+        // Planned meetings of the team in the next 7 days
         List<Meeting> upcomingMeetings = meetingRepository.findAllByTeamIdOrderByScheduledDateDesc(
                 team.getId(), Pageable.unpaged()).getContent().stream()
+                .filter(m -> m.getStatus() == MeetingStatus.PLANNED)
                 .filter(m -> m.getScheduledDate().isAfter(now) && m.getScheduledDate().isBefore(nextWeek))
                 .toList();
 
-        // Overdue actions for team members
-        var overdueActions = actionRepository.findAllByOwnerIdAndStatusInAndDueDateBeforeOrderByDueDateAsc(
-                lead.getId(), List.of(ActionStatus.OPEN, ActionStatus.IN_PROGRESS), LocalDate.now(), pageable);
-        // Note: in production this should query all team members' actions
+        // Overdue actions of all team members, the oldest first
+        List<QuickActionDto> overdueActions = members.stream()
+                .flatMap(m -> actionRepository.findAllByOwnerIdAndStatusInAndDueDateBeforeOrderByDueDateAsc(
+                        m.getUser().getId(), OPEN_STATUSES, LocalDate.now(), PageRequest.of(0, 10)).getContent().stream())
+                .limit(10)
+                .map(a -> new QuickActionDto(a.getId(), a.getText(), a.getOwner().getId(),
+                        a.getDueDate(), true, "1:1 Action"))
+                .toList();
 
         // Member cards
         List<TeamMemberCardDto> memberCards = members.stream().map(m -> {
             User member = m.getUser();
-            var memberMeetings = meetingRepository.findAllByParticipantIdOrderByScheduledDateDesc(
-                    member.getId(), PageRequest.of(0, 1));
-            Instant lastMeeting = memberMeetings.hasContent()
-                    ? memberMeetings.getContent().getFirst().getScheduledDate() : null;
+            // Last 1:1 that actually took place, not a planned one
+            Instant lastMeeting = meetingRepository
+                    .findTopByParticipantIdAndStatusOrderByScheduledDateDesc(member.getId(), MeetingStatus.COMPLETED)
+                    .map(Meeting::getScheduledDate)
+                    .orElse(null);
 
             var memberScores = scoreRepository.findAllByUserId(member.getId(), Pageable.unpaged()).getContent();
             double avgScore = memberScores.stream()
@@ -267,15 +276,19 @@ public class DashboardService {
 
             return new TeamMemberCardDto(
                     member.getId(), member.getFirstName() + " " + member.getLastName(),
-                    member.getAvatarUrl(), m.getRole().name(), lastMeeting, 0, avgScore
+                    member.getAvatarUrl(), m.getRole().name(), lastMeeting,
+                    actionRepository.countByOwnerIdAndStatusIn(member.getId(), OPEN_STATUSES), avgScore
             );
         }).toList();
 
         // Bus factor alerts
         List<BusFactorAlertDto> busAlerts = buildBusFactorAlerts(team);
 
-        // Team energy average
-        var pulses = pulseRepository.findAllByUserIdOrderByCreatedAtDesc(lead.getId(), Pageable.unpaged()).getContent();
+        // Team energy average over the pulse surveys of all members
+        var pulses = members.stream()
+                .flatMap(m -> pulseRepository.findAllByUserIdOrderByCreatedAtDesc(
+                        m.getUser().getId(), Pageable.unpaged()).getContent().stream())
+                .toList();
         Double avgEnergy = pulses.stream()
                 .filter(p -> p.getEnergyScore() != null)
                 .mapToInt(p -> p.getEnergyScore())
@@ -291,9 +304,7 @@ public class DashboardService {
         return new TeamHealthDto(
                 team.getName(),
                 upcomingMeetings.stream().map(this::toMeetingPreview).toList(),
-                overdueActions.getContent().stream()
-                        .map(a -> new QuickActionDto(a.getId(), a.getText(), a.getOwner().getId(),
-                                a.getDueDate(), true, "1:1 Action")).toList(),
+                overdueActions,
                 memberCards,
                 busAlerts,
                 avgEnergy,
@@ -340,8 +351,11 @@ public class DashboardService {
             int memberCount = members.size();
             clusterMemberCount += memberCount;
 
-            // Overdue actions (simplified: count OPEN/IN_PROGRESS past due)
-            long overdue = 0; // Would need more complex query in production
+            // Overdue actions of all team members: OPEN or IN_PROGRESS and past due
+            long overdue = members.stream()
+                    .mapToLong(m -> actionRepository.countByOwnerIdAndStatusInAndDueDateBefore(
+                            m.getUser().getId(), OPEN_STATUSES, LocalDate.now()))
+                    .sum();
             clusterOverdue += overdue;
 
             // Bus factor issues

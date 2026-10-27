@@ -72,6 +72,10 @@ public class Meeting {
     @Column(name = "private_notes", columnDefinition = "TEXT")
     private String privateNotes;
 
+    /** Questions and topics the participant wants to raise. Written by the participant only. */
+    @Column(name = "participant_agenda", columnDefinition = "TEXT")
+    private String participantAgenda;
+
     @Version
     private Long version;
 
@@ -121,6 +125,9 @@ public class Meeting {
 
     public String getPrivateNotes() { return privateNotes; }
     public void setPrivateNotes(String privateNotes) { this.privateNotes = privateNotes; }
+
+    public String getParticipantAgenda() { return participantAgenda; }
+    public void setParticipantAgenda(String participantAgenda) { this.participantAgenda = participantAgenda; }
 
     public Long getVersion() { return version; }
 

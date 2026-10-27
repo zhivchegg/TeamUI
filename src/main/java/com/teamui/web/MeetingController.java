@@ -136,6 +136,17 @@ public class MeetingController {
         return ResponseEntity.ok(meetingService.updateNotes(user, id, request));
     }
 
+    /**
+     * Update the participant's agenda for the meeting.
+     */
+    @PutMapping("/{id}/agenda")
+    public ResponseEntity<MeetingResponse> updateAgenda(
+            @AuthenticationPrincipal UserDetailsImpl user,
+            @PathVariable UUID id,
+            @RequestBody @Valid UpdateAgendaRequest request) {
+        return ResponseEntity.ok(meetingService.updateAgenda(user, id, request));
+    }
+
     // ------------------------------------------------------------------
     // Actions
     // ------------------------------------------------------------------

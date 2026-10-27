@@ -34,6 +34,10 @@ public interface MeetingActionRepository extends JpaRepository<MeetingAction, UU
     Page<MeetingAction> findAllByOwnerIdAndStatusOrderByDueDateAsc(
             UUID ownerId, ActionStatus status, Pageable pageable);
 
+    /** Actions of an owner in any of the given statuses, the earliest due date first. */
+    Page<MeetingAction> findAllByOwnerIdAndStatusInOrderByDueDateAsc(
+            UUID ownerId, Collection<ActionStatus> statuses, Pageable pageable);
+
     /**
      * Find overdue or soon-due actions for an owner.
      *
@@ -45,4 +49,10 @@ public interface MeetingActionRepository extends JpaRepository<MeetingAction, UU
      */
     Page<MeetingAction> findAllByOwnerIdAndStatusInAndDueDateBeforeOrderByDueDateAsc(
             UUID ownerId, List<ActionStatus> statuses, LocalDate dueDate, Pageable pageable);
+
+    /** Number of actions of an owner in the given statuses. */
+    long countByOwnerIdAndStatusIn(UUID ownerId, Collection<ActionStatus> statuses);
+
+    /** Number of overdue actions of an owner: in the given statuses and due before the date. */
+    long countByOwnerIdAndStatusInAndDueDateBefore(UUID ownerId, Collection<ActionStatus> statuses, LocalDate dueDate);
 }
