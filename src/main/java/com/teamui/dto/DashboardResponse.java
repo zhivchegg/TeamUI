@@ -21,6 +21,7 @@ import java.util.UUID;
  * @param streamOverview  STREAM_LEAD / STREAM_IT_LEAD view: aggregate metrics across clusters
  * @param clusterOverview CLUSTER_LEAD / CLUSTER_IT_LEAD view: health of the teams in one cluster
  * @param teamName        name of the user's team for TEAM_MEMBER, TEAM_LEAD and IT_LEAD, otherwise null
+ * @param teamId          id of the user's team for TEAM_MEMBER, TEAM_LEAD and IT_LEAD, otherwise null
  * @author TeamUI
  * @since 0.0.1
  */
@@ -32,5 +33,6 @@ public record DashboardResponse(
         TeamHealthDto teamHealth,
         StreamOverviewDto streamOverview,
         ClusterSummaryDto clusterOverview,
-        String teamName
+        String teamName,
+        UUID teamId
 ) {}
