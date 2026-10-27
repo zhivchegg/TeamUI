@@ -172,7 +172,7 @@ export function DashboardPage() {
                   <li key={s.systemId}>
                     <strong>{s.systemName}</strong>{' '}
                     <span className="muted">
-                      ({criticalityLabel(s.criticality)}), экспертов: {s.expertCount} из {s.totalMembers}
+                      ({criticalityLabel(s.criticality)}), экспертов: {s.expertCount}, продвинутых: {s.advancedCount}
                       {s.expertNames.length > 0 ? `: ${s.expertNames.join(', ')}` : ''}
                     </span>
                   </li>

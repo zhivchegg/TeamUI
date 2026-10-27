@@ -75,6 +75,8 @@ export function MeetingDetailPage() {
   const isParticipant = meeting.participantId === viewerId;
   const isAuthor = meeting.leadId === viewerId;
   const isLead = !isParticipant;
+  // Повестку нельзя писать к отменённой встрече и к той, на которую участник не пришёл.
+  const agendaClosed = meeting.status === 'CANCELLED' || meeting.status === 'NO_SHOW';
 
   async function onSaveParams(e: FormEvent) {
     e.preventDefault();
@@ -236,7 +238,9 @@ export function MeetingDetailPage() {
 
       <section className="card">
         <h2>Повестка участника</h2>
-        {isParticipant ? (
+        {isParticipant && agendaClosed ? (
+          <p className="muted">Повестка недоступна: встреча отменена или не состоялась.</p>
+        ) : isParticipant ? (
           <form onSubmit={onSaveAgenda} className="stack">
             <label>
               Вопросы и темы, которые вы хотите обсудить

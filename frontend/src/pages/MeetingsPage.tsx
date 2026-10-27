@@ -141,6 +141,21 @@ export function MeetingsPage() {
   );
 }
 
+/**
+ * Сначала запланированные встречи в будущем, ближайшие первыми, затем остальные,
+ * последние по дате первыми.
+ */
+function sortMeetings(meetings: Meeting[]): Meeting[] {
+  const now = Date.now();
+  const upcoming = meetings
+    .filter((m) => m.status === 'PLANNED' && new Date(m.scheduledDate).getTime() > now)
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  const rest = meetings
+    .filter((m) => !(m.status === 'PLANNED' && new Date(m.scheduledDate).getTime() > now))
+    .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
+  return [...upcoming, ...rest];
+}
+
 /** Таблица встреч: участнику показываем ведущего, лиду показываем участника. */
 function MeetingTable({ meetings, view }: { meetings: Meeting[] | null; view: 'participant' | 'lead' }) {
   if (meetings === null) {
@@ -160,7 +175,7 @@ function MeetingTable({ meetings, view }: { meetings: Meeting[] | null; view: 'p
         </tr>
       </thead>
       <tbody>
-        {meetings.map((m) => (
+        {sortMeetings(meetings).map((m) => (
           <tr key={m.id}>
             <td>
               <Link to={`/meetings/${m.id}`}>{formatDateTime(m.scheduledDate)}</Link>

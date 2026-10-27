@@ -24,12 +24,16 @@ function Shell() {
   const location = useLocation();
   const [unread, setUnread] = useState(0);
 
-  // Счётчик обновляем при каждом переходе: уведомления читают на отдельной странице.
+  // Счётчик обновляем при каждом переходе и раз в минуту, чтобы новые уведомления были видны без перезагрузки.
   useEffect(() => {
     if (!user) return;
-    getUnreadCount()
-      .then((r) => setUnread(r.count))
-      .catch(() => setUnread(0));
+    const refresh = () =>
+      getUnreadCount()
+        .then((r) => setUnread(r.count))
+        .catch(() => setUnread(0));
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
   }, [user, location.pathname]);
 
   return (
